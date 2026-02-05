@@ -5,6 +5,32 @@ All notable changes to ServerPod Boost will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.html).
 
+## [0.1.1] - 2026-02-05
+
+### Fixed
+- **Install Command**: Fixed skills not being copied to user projects
+  - Corrected path calculation from `.parent.parent.parent` to `.parent.parent`
+  - Added `.ai/skills/` as package assets in `pubspec.yaml`
+  - Skills are now properly copied during installation
+- **Install Command**: Made interactive mode the default behavior
+  - Added `--non-interactive` flag for silent installation
+  - Removed `--interactive` flag (now default)
+- **Install Command**: Added `install` executable alongside `boost`
+  - Users can now run `dart run serverpod_boost:install`
+  - Created `bin/install.dart` entry point
+- **Install Command**: Fixed skill selection flow
+  - Handles missing skills directory gracefully
+  - Copies all built-in skills when selection list is empty
+- **Code Quality**: Fixed all dart analyze warnings (41 warnings → 0)
+  - Removed duplicate exports and unused imports
+  - Fixed deprecated MCP imports
+  - Replaced print() statements with stdout.writeln()
+  - Fixed null safety issues and unnecessary casts
+- **Analysis Options**: Removed undefined lint rule `prefer_async_await`
+
+### Changed
+- Package URLs updated to use `qazz92/serverpod_boost` repository
+
 ## [0.1.0] - 2026-02-05
 
 ### Added
