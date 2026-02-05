@@ -60,7 +60,7 @@ class InstallCommand extends Command {
       // Check for command-line flags
       final args = _parseArgs();
 
-      if (args['interactive'] == true) {
+      if (args['nonInteractive'] != true) {
         await _runInteractive();
       } else {
         await _runNonInteractive(args);
@@ -95,8 +95,8 @@ class InstallCommand extends Command {
         args['features'] = ['skills'];
       } else if (arg == '--mcp') {
         args['features'] = ['mcp'];
-      } else if (arg == '--interactive' || arg == '-i') {
-        args['interactive'] = true;
+      } else if (arg == '--non-interactive') {
+        args['nonInteractive'] = true;
       } else if (arg == '--overwrite') {
         args['overwrite'] = true;
       } else if (arg == '--full-skills') {
@@ -194,8 +194,17 @@ class InstallCommand extends Command {
     ConsoleHelper.subHeader('Select Skills');
 
     // Discover available skills
-    final loader = SkillLoader(skillsPath: _config.skillsPath);
-    final allSkills = await loader.listSkillNames();
+    List<String> allSkills;
+    try {
+      final loader = SkillLoader(skillsPath: _config.skillsPath);
+      allSkills = await loader.listSkillNames();
+    } catch (e) {
+      // Skills directory doesn't exist yet - will copy built-in skills during installation
+      ConsoleHelper.info('Skills will be copied from Boost package during installation');
+      ConsoleHelper.indent('Essential skills (core, endpoints) will be included');
+      ConsoleHelper.indent('Tip: Use --full-skills flag to include all available skills');
+      return [];
+    }
 
     if (allSkills.isEmpty) {
       ConsoleHelper.warning('No skills found');
@@ -380,11 +389,24 @@ class InstallCommand extends Command {
         ConsoleHelper.indent('Created directory: $targetSkillsPath');
       }
 
-      // Copy all skill directories
+      // Determine which skills to copy
+      // If config has specific skills, copy only those
+      // If config is empty (skills not yet selected), copy all available skills
+      final skillsToCopy = _config.skills.isEmpty
+          ? await _listAvailableSkills(sourceDir)
+          : _config.skills;
+
+      // Copy skill directories
       final copiedSkills = <String>[];
       await for (final entity in sourceDir.list(recursive: false, followLinks: false)) {
         if (entity is Directory) {
           final skillName = entity.path.split(Platform.pathSeparator).last;
+
+          // Skip if not in the list of skills to copy
+          if (skillsToCopy.isNotEmpty && !skillsToCopy.contains(skillName)) {
+            continue;
+          }
+
           final targetPath = '$targetSkillsPath/$skillName';
 
           // Remove existing if overwrite is enabled
@@ -427,10 +449,35 @@ class InstallCommand extends Command {
     }
   }
 
+  /// List all available skill directories in the source directory
+  Future<List<String>> _listAvailableSkills(Directory sourceDir) async {
+    final skills = <String>[];
+    await for (final entity in sourceDir.list(recursive: false, followLinks: false)) {
+      if (entity is Directory) {
+        final skillName = entity.path.split(Platform.pathSeparator).last;
+        skills.add(skillName);
+      }
+    }
+    return skills;
+  }
+
   /// Find the Boost package skills directory
-  /// Handles both local path dependencies and published packages
+  /// Uses the package's own .ai/skills directory
   Future<String> _findBoostSkillsPath() async {
-    // Strategy 1: Try to resolve from pubspec.lock (for local path dependencies)
+    // Strategy 1: Try to navigate from executable (for activated packages)
+    try {
+      final currentScript = File.fromUri(Platform.script);
+      final boostPackageRoot = currentScript.parent.parent.path;
+      final skillsPath = '$boostPackageRoot/.ai/skills/serverpod';
+      if (await Directory(skillsPath).exists()) {
+        ConsoleHelper.indent('Found Boost skills via executable path');
+        return skillsPath;
+      }
+    } catch (e) {
+      ConsoleHelper.indent('Failed to resolve via executable path: $e');
+    }
+
+    // Strategy 2: Try to resolve from pubspec.lock (for local path dependencies)
     final pubspecLockPath = '${_project!.serverPath}/pubspec.lock';
     final pubspecLockFile = File(pubspecLockPath);
 
@@ -439,8 +486,9 @@ class InstallCommand extends Command {
         final lockContent = await pubspecLockFile.readAsString();
         final boostPath = _parsePubspecLockForBoostPath(lockContent, _project!.serverPath ?? _project!.rootPath);
         if (boostPath != null) {
-          final skillsPath = '$boostPath/.ai/skills';
+          final skillsPath = '$boostPath/.ai/skills/serverpod';
           if (await Directory(skillsPath).exists()) {
+            ConsoleHelper.indent('Found Boost skills via pubspec.lock');
             return skillsPath;
           }
         }
@@ -449,24 +497,11 @@ class InstallCommand extends Command {
       }
     }
 
-    // Strategy 2: Try to navigate from executable (for activated packages)
-    try {
-      final currentScript = File.fromUri(Platform.script);
-      final boostPackageRoot = currentScript.parent.parent.parent.path;
-      final skillsPath = '$boostPackageRoot/.ai/skills';
-      if (await Directory(skillsPath).exists()) {
-        ConsoleHelper.indent('Found Boost via executable path');
-        return skillsPath;
-      }
-    } catch (e) {
-      ConsoleHelper.indent('Failed to resolve via executable path: $e');
-    }
-
     // Strategy 3: Return default path (will be checked later)
-    ConsoleHelper.indent('Using default path (skills will be loaded from package assets)');
+    ConsoleHelper.indent('Using default path');
     final currentScript = File.fromUri(Platform.script);
-    final boostPackageRoot = currentScript.parent.parent.parent.path;
-    return '$boostPackageRoot/.ai/skills';
+    final boostPackageRoot = currentScript.parent.parent.path;
+    return '$boostPackageRoot/.ai/skills/serverpod';
   }
 
   /// Parse pubspec.lock to find the serverpod_boost package path
