@@ -1,18 +1,19 @@
+import 'dart:io';
 import 'package:console/console.dart';
 
 class ConsoleHelper {
   static void header(String text) {
-    print('');
-    print('═' * 50);
-    print(text);
-    print('═' * 50);
-    print('');
+    stdout.writeln('');
+    stdout.writeln('═' * 50);
+    stdout.writeln(text);
+    stdout.writeln('═' * 50);
+    stdout.writeln('');
   }
 
   static void section(String text) {
-    print('');
-    print('▸ $text');
-    print('');
+    stdout.writeln('');
+    stdout.writeln('▸ $text');
+    stdout.writeln('');
   }
 
   static void success(String text) {
@@ -32,6 +33,6 @@ class ConsoleHelper {
   }
 
   static void clear() {
-    print('\x1B[2J\x1B[H');
+    stdout.write('\x1B[2J\x1B[H');
   }
 }

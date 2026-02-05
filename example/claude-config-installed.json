@@ -7,7 +7,7 @@
         "run",
         ".ai/boost/bin/boost.dart"
       ],
-      "cwd": "/Users/musinsa/always_summer/pilly",
+      "cwd": "/Users/qazz92/always_summer/pilly",
       "env": {
         "SERVERPOD_BOOST_VERBOSE": "true"
       }

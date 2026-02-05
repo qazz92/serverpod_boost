@@ -5,10 +5,10 @@ library serverpod_boost.boost_exception;
 
 /// Base exception for all Boost-related errors
 class BoostException implements Exception {
+  const BoostException(this.message, [this.cause]);
+
   final String message;
   final dynamic cause;
-
-  const BoostException(this.message, [this.cause]);
 
   @override
   String toString() => 'BoostException: $message${cause != null ? ' (caused by: $cause)' : ''}';

@@ -5,7 +5,6 @@
 library serverpod_boost.project_context;
 
 import 'serverpod/serverpod_locator.dart';
-import 'serverpod/spy_yaml_parser.dart';
 
 /// Database type used by the project
 enum DatabaseType {
@@ -16,6 +15,39 @@ enum DatabaseType {
 
 /// Project context information
 class ProjectContext {
+  const ProjectContext({
+    required this.projectName,
+    required this.serverpodVersion,
+    required this.rootPath,
+    this.databaseType = DatabaseType.unknown,
+    this.hasEndpoints = false,
+    this.hasModels = false,
+    this.hasMigrations = false,
+    this.usesRedis = false,
+    this.endpoints = const [],
+    this.models = const [],
+    this.migrations = const [],
+  });
+
+  /// Create project context from a ServerPod project
+  factory ProjectContext.fromProject(ServerPodProject project) {
+    final projectName = _extractProjectName(project.rootPath);
+
+    return ProjectContext(
+      projectName: projectName,
+      serverpodVersion: '3.2.3', // TODO: Extract from pubspec.yaml
+      rootPath: project.rootPath,
+      databaseType: _detectDatabaseType(project),
+      hasEndpoints: project.endpointFiles.isNotEmpty,
+      hasModels: project.modelFiles.isNotEmpty,
+      hasMigrations: project.migrationFiles.isNotEmpty,
+      usesRedis: _detectRedisUsage(project),
+      endpoints: _extractEndpointInfo(project),
+      models: _extractModelInfo(project),
+      migrations: _extractMigrationInfo(project),
+    );
+  }
+
   /// Project name
   final String projectName;
 
@@ -48,39 +80,6 @@ class ProjectContext {
 
   /// List of migration information
   final List<MigrationInfo> migrations;
-
-  const ProjectContext({
-    required this.projectName,
-    required this.serverpodVersion,
-    required this.rootPath,
-    this.databaseType = DatabaseType.unknown,
-    this.hasEndpoints = false,
-    this.hasModels = false,
-    this.hasMigrations = false,
-    this.usesRedis = false,
-    this.endpoints = const [],
-    this.models = const [],
-    this.migrations = const [],
-  });
-
-  /// Create project context from a ServerPod project
-  factory ProjectContext.fromProject(ServerPodProject project) {
-    final projectName = _extractProjectName(project.rootPath);
-
-    return ProjectContext(
-      projectName: projectName,
-      serverpodVersion: '3.2.3', // TODO: Extract from pubspec.yaml
-      rootPath: project.rootPath,
-      databaseType: _detectDatabaseType(project),
-      hasEndpoints: project.endpointFiles.isNotEmpty,
-      hasModels: project.modelFiles != null && project.modelFiles!.isNotEmpty,
-      hasMigrations: project.migrationFiles.isNotEmpty,
-      usesRedis: _detectRedisUsage(project),
-      endpoints: _extractEndpointInfo(project),
-      models: _extractModelInfo(project),
-      migrations: _extractMigrationInfo(project),
-    );
-  }
 
   /// Get endpoint count
   int get endpointCount => endpoints.length;
@@ -158,17 +157,17 @@ class ProjectContext {
 
 /// Information about an endpoint
 class EndpointInfo {
-  final String name;
-  final String file;
-  final int methodCount;
-  final List<MethodInfo> methods;
-
   const EndpointInfo({
     required this.name,
     required this.file,
     this.methodCount = 0,
     this.methods = const [],
   });
+
+  final String name;
+  final String file;
+  final int methodCount;
+  final List<MethodInfo> methods;
 
   Map<String, dynamic> toJson() {
     return {
@@ -182,17 +181,17 @@ class EndpointInfo {
 
 /// Information about a method in an endpoint
 class MethodInfo {
-  final String name;
-  final String returnType;
-  final String signature;
-  final int lineNumber;
-
   const MethodInfo({
     required this.name,
     required this.returnType,
     required this.signature,
     required this.lineNumber,
   });
+
+  final String name;
+  final String returnType;
+  final String signature;
+  final int lineNumber;
 
   Map<String, dynamic> toJson() {
     return {
@@ -206,17 +205,17 @@ class MethodInfo {
 
 /// Information about a model
 class ModelInfo {
-  final String name;
-  final String file;
-  final String? namespace;
-  final List<FieldInfo> fields;
-
   const ModelInfo({
     required this.name,
     required this.file,
     this.namespace,
     this.fields = const [],
   });
+
+  final String name;
+  final String file;
+  final String? namespace;
+  final List<FieldInfo> fields;
 
   Map<String, dynamic> toJson() {
     return {
@@ -230,15 +229,15 @@ class ModelInfo {
 
 /// Information about a field in a model
 class FieldInfo {
-  final String name;
-  final String type;
-  final bool isNullable;
-
   const FieldInfo({
     required this.name,
     required this.type,
     this.isNullable = false,
   });
+
+  final String name;
+  final String type;
+  final bool isNullable;
 
   Map<String, dynamic> toJson() {
     return {
@@ -251,13 +250,13 @@ class FieldInfo {
 
 /// Information about a migration
 class MigrationInfo {
-  final String name;
-  final String file;
-
   const MigrationInfo({
     required this.name,
     required this.file,
   });
+
+  final String name;
+  final String file;
 
   Map<String, dynamic> toJson() {
     return {

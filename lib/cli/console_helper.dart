@@ -33,32 +33,32 @@ class ConsoleHelper {
     final width = terminalWidth;
     final line = '═' * width;
 
-    print(line);
-    print(_centerText(title, width));
+    stdout.writeln(line);
+    stdout.writeln(_centerText(title, width));
     if (subtitle != null) {
-      print(_centerText(subtitle, width));
+      stdout.writeln(_centerText(subtitle, width));
     }
-    print(line);
-    print('');
+    stdout.writeln(line);
+    stdout.writeln('');
   }
 
   /// Display a sub-header
   static void subHeader(String title) {
-    print('');
-    print('┌─ $title');
-    print('│');
+    stdout.writeln('');
+    stdout.writeln('┌─ $title');
+    stdout.writeln('│');
   }
 
   /// Close a sub-header section
   static void closeSection() {
-    print('│');
-    print('└─ ${'─' * (terminalWidth - 3)}');
-    print('');
+    stdout.writeln('│');
+    stdout.writeln('└─ ${'─' * (terminalWidth - 3)}');
+    stdout.writeln('');
   }
 
   /// Display success message
   static void success(String message) {
-    print('\x1B[32m✓\x1B[0m $message');
+    stdout.writeln('\x1B[32m✓\x1B[0m $message');
   }
 
   /// Display error message
@@ -68,18 +68,18 @@ class ConsoleHelper {
 
   /// Display warning message
   static void warning(String message) {
-    print('\x1B[33m⚠\x1B[0m $message');
+    stdout.writeln('\x1B[33m⚠\x1B[0m $message');
   }
 
   /// Display info message
   static void info(String message) {
-    print('  $message');
+    stdout.writeln('  $message');
   }
 
   /// Display indented text
   static void indent(String text, {int spaces = 2}) {
     final prefix = ' ' * spaces;
-    print(prefix + text);
+    stdout.writeln(prefix + text);
   }
 
   /// Display a list of items
@@ -101,7 +101,7 @@ class ConsoleHelper {
     for (var i = 0; i < items.length; i += columns) {
       final row = items.skip(i).take(columns).toList();
       final line = row.map((item) => item.padRight(columnWidth)).join();
-      print(line);
+      stdout.writeln(line);
     }
   }
 
@@ -110,28 +110,28 @@ class ConsoleHelper {
     final percentage = total > 0 ? ((current / total) * 100).round() : 0;
     final bar = '█' * (percentage ~/ 5);
     final empty = '░' * (20 - (percentage ~/ 5));
-    print('\r  [$bar$empty] $percentage% - $message');
+    stdout.write('\r  [$bar$empty] $percentage% - $message');
   }
 
   /// Display a horizontal rule
   static void rule({String character = '─'}) {
-    print(character * terminalWidth);
+    stdout.writeln(character * terminalWidth);
   }
 
   /// Display a bullet point
   static void bullet(String text, {String bullet = '•'}) {
-    print('  $bullet $text');
+    stdout.writeln('  $bullet $text');
   }
 
   /// Display a checkbox item
   static void checkbox(String text, {bool checked = false}) {
     final mark = checked ? '☑' : '☐';
-    print('  $mark $text');
+    stdout.writeln('  $mark $text');
   }
 
   /// Display a step counter
   static void step(int step, int total, String description) {
-    print('  [$step/$total] $description');
+    stdout.writeln('  [$step/$total] $description');
   }
 
   /// Clear current line
@@ -152,7 +152,7 @@ class ConsoleHelper {
       for (var i = 0; i < row.length && i < widths.length; i++) {
         cells.add(row[i].padRight(widths[i]));
       }
-      print(cells.join('  '));
+      stdout.writeln(cells.join('  '));
     }
   }
 
@@ -180,7 +180,7 @@ class ConsoleHelper {
 
   /// Display a menu option
   static void menuOption(String key, String description) {
-    print('  [$key] $description');
+    stdout.writeln('  [$key] $description');
   }
 
   /// Display a prompt
@@ -204,14 +204,14 @@ class ConsoleHelper {
 
   /// Display a selection prompt
   static String select(String question, List<String> options) {
-    print('\x1B[36m?\x1B[0m $question');
-    print('');
+    stdout.writeln('\x1B[36m?\x1B[0m $question');
+    stdout.writeln('');
 
     for (var i = 0; i < options.length; i++) {
       menuOption('${i + 1}', options[i]);
     }
 
-    print('');
+    stdout.writeln('');
 
     while (true) {
       final response = prompt('Select an option (1-${options.length})');
@@ -228,19 +228,19 @@ class ConsoleHelper {
   /// Display a multi-select prompt
   static List<String> multiselect(String question, List<String> options,
       {List<int> defaultIndices = const []}) {
-    print('\x1B[36m?\x1B[0m $question');
-    print('');
-    print('Select items by typing numbers separated by commas (e.g., 1,3,5)');
-    print('Press Enter to confirm');
-    print('');
+    stdout.writeln('\x1B[36m?\x1B[0m $question');
+    stdout.writeln('');
+    stdout.writeln('Select items by typing numbers separated by commas (e.g., 1,3,5)');
+    stdout.writeln('Press Enter to confirm');
+    stdout.writeln('');
 
     for (var i = 0; i < options.length; i++) {
       final isSelected = defaultIndices.contains(i + 1);
       final mark = isSelected ? '☑' : '☐';
-      print('  $mark [${i + 1}] ${options[i]}');
+      stdout.writeln('  $mark [${i + 1}] ${options[i]}');
     }
 
-    print('');
+    stdout.writeln('');
 
     while (true) {
       stdout.write('\x1B[36m?\x1B[0m Selection [${defaultIndices.join(',')}] ');
@@ -270,23 +270,23 @@ class ConsoleHelper {
     final padding = (width - text.length - 4) ~/ 2;
     final left = '─' * padding;
     final right = '─' * (width - text.length - 4 - padding);
-    print('$left  $text  $right');
+    stdout.writeln('$left  $text  $right');
   }
 
   /// Display an outro message
   static void outro(String message, {String? link}) {
-    print('');
+    stdout.writeln('');
     rule();
-    print(message);
+    stdout.writeln(message);
     if (link != null) {
-      print(link);
+      stdout.writeln(link);
     }
     rule();
-    print('');
+    stdout.writeln('');
   }
 
   /// New line
   static void newLine([int count = 1]) {
-    print('\n' * (count - 1));
+    stdout.writeln('\n' * (count - 1));
   }
 }

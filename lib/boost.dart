@@ -5,13 +5,9 @@ library serverpod_boost;
 
 export 'boost_exception.dart';
 export 'tool_registry.dart';
-export 'mcp/mcp_protocol.dart';
-export 'mcp/mcp_server.dart';
-export 'mcp/mcp_transport.dart';
 export 'mcp/mcp_request.dart';
 export 'mcp/mcp_response.dart';
 export 'mcp/mcp_tool.dart';
-export 'mcp/mcp_transport.dart';
 export 'tools/tools.dart';
 export 'skills/skill.dart';
 export 'skills/skill_metadata.dart';

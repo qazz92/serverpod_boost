@@ -2,10 +2,8 @@
 library serverpod_boost.test.guidelines.guideline_writer_test;
 
 import 'dart:io';
-import 'dart:math';
 
 import 'package:test/test.dart';
-import 'package:serverpod_boost/guidelines/agent_type.dart';
 import 'package:serverpod_boost/skills/skill_composer.dart';
 import 'package:serverpod_boost/skills/skill_loader.dart';
 import 'package:serverpod_boost/skills/skill.dart';
@@ -1035,12 +1033,10 @@ String _mergeWithExistingContent(String existingContent, String newContent) {
   // Find the separator in the new content
   final newLines = newContent.split('\n');
   final buffer = StringBuffer();
-  bool foundSeparator = false;
 
   // Copy everything from new content until the separator
   for (final line in newLines) {
     if (line.trim() == '<serverpod-boost-guidelines>') {
-      foundSeparator = true;
       break;
     }
     buffer.writeln(line);
@@ -1078,7 +1074,6 @@ Map<String, String> _parseSections(String content) {
 
   String? currentHeader;
   final currentContent = <String>[];
-  var foundHeader = false;
 
   for (final line in lines) {
     // Check for frontmatter start/end
@@ -1111,10 +1106,8 @@ Map<String, String> _parseSections(String content) {
         currentHeader = line.substring(1).trim().toLowerCase();
         currentContent.clear();
         currentContent.add(line); // Include the header line
-        foundHeader = true;
       } else {
         currentContent.add(line);
-        foundHeader = false;
       }
     }
   }

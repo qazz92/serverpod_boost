@@ -363,10 +363,6 @@ void main() {
 
     group('empty skill list', () {
       test('handles empty skill list gracefully', () async {
-        // Arrange
-        final skills = await loader.loadAll();
-        final skillNames = [];
-
         // Act
         final result =
             '''
@@ -385,10 +381,6 @@ No skills were requested.
       });
 
       test('generates document with just header for empty list', () async {
-        // Arrange
-        final skills = await loader.loadAll();
-        final skillNames = [];
-
         // Act
         final result =
             '''
@@ -583,9 +575,6 @@ List<Skill> _sortSkillsWithDependencies(
   List<Skill> allSkills,
   List<String> requestedSkillNames,
 ) {
-  final requestedSkills = allSkills
-      .where((s) => requestedSkillNames.contains(s.name))
-      .toList();
   final dependencyGraph = <String, Set<String>>{};
 
   // Build dependency graph
@@ -605,8 +594,7 @@ List<Skill> _sortSkillsWithDependencies(
     if (visited.contains(skillName)) return;
 
     visiting.add(skillName);
-    for (final dependency
-        in (dependencyGraph[skillName] as Set<String> ?? {})) {
+    for (final dependency in dependencyGraph[skillName]!) {
       visit(dependency);
     }
     visiting.remove(skillName);
@@ -622,26 +610,6 @@ List<Skill> _sortSkillsWithDependencies(
   return sorted
       .map((name) => allSkills.firstWhere((s) => s.name == name))
       .toList();
-}
-
-/// Helper to create a test skill
-Future<void> _createTestSkill(
-  String basePath,
-  String name,
-  String title,
-  String description,
-) async {
-  final skillDir = Directory(p.join(basePath, name));
-  await skillDir.create();
-
-  final skillFile = File(p.join(skillDir.path, 'SKILL.md.mustache'));
-  await skillFile.writeAsString('''
-# $title
-
-$description
-
-This is the $name skill content.
-''');
 }
 
 /// Helper to create a test skill with metadata

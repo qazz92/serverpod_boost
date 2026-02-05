@@ -12,13 +12,9 @@ import 'package:serverpod_boost/commands/skill_add_command.dart';
 import 'package:serverpod_boost/commands/skill_remove_command.dart';
 import 'package:serverpod_boost/commands/install_command.dart';
 import 'package:serverpod_boost/mcp/boost_mcp_server.dart';
-import 'package:serverpod_boost/serverpod/serverpod_locator.dart';
 
 /// CLI application for ServerPod Boost
 class CLIApp {
-  /// Registered commands
-  final Map<String, Command Function()> _commands;
-
   /// Create a new CLI app
   CLIApp()
       : _commands = {
@@ -29,6 +25,9 @@ class CLIApp {
           'skill:remove': () => SkillRemoveCommand(),
           'install': () => InstallCommand(),
         };
+
+  /// Registered commands
+  final Map<String, Command Function()> _commands;
 
   /// Run the CLI app
   Future<void> run(List<String> args) async {
@@ -214,38 +213,38 @@ class CLIApp {
 
   /// Show help message
   void _showHelp() {
-    print('ServerPod Boost - AI acceleration for ServerPod development');
-    print('');
-    print('Usage:');
-    print('  boost <command> [options]');
-    print('  boost [mcp-options]        # Run as MCP server (default)');
-    print('');
-    print('Commands:');
-    print('  install                     Install ServerPod Boost (guidelines, skills, MCP config)');
-    print('  skill:list                  List all available skills');
-    print('  skill:show <skill-name>     Show details of a specific skill');
-    print('  skill:add <repo> [skill]    Add a skill from a GitHub repository');
-    print('  skill:remove <name>         Remove a skill from local directory');
-    print('  skill:render <skill-name>   Render a skill template');
-    print('');
-    print('Options:');
-    print('  --skills-path=<path>        Path to skills directory');
-    print('                              (default: .ai/skills)');
-    print('  -v, --verbose               Enable verbose logging');
-    print('  -h, --help                  Show this help message');
-    print('');
-    print('MCP Server Options:');
-    print('  --verbose                   Enable verbose logging');
-    print('');
-    print('Examples:');
-    print('  boost install                         # Install ServerPod Boost');
-    print('  boost skill:list                      # List all skills');
-    print('  boost skill:show create-endpoint      # Show skill details');
-    print('  boost skill:add username/repo         # List skills from a GitHub repo');
-    print('  boost skill:add username/repo skill   # Add a specific skill');
-    print('  boost skill:remove my-skill           # Remove a skill');
-    print('  boost skill:render create-endpoint    # Render skill to stdout');
-    print('  boost skill:render create-endpoint output.md  # Write to file');
-    print('  boost --verbose                       # Run MCP server with verbose logging');
+    stderr.writeln('ServerPod Boost - AI acceleration for ServerPod development');
+    stderr.writeln('');
+    stderr.writeln('Usage:');
+    stderr.writeln('  boost <command> [options]');
+    stderr.writeln('  boost [mcp-options]        # Run as MCP server (default)');
+    stderr.writeln('');
+    stderr.writeln('Commands:');
+    stderr.writeln('  install                     Install ServerPod Boost (guidelines, skills, MCP config)');
+    stderr.writeln('  skill:list                  List all available skills');
+    stderr.writeln('  skill:show <skill-name>     Show details of a specific skill');
+    stderr.writeln('  skill:add <repo> [skill]    Add a skill from a GitHub repository');
+    stderr.writeln('  skill:remove <name>         Remove a skill from local directory');
+    stderr.writeln('  skill:render <skill-name>   Render a skill template');
+    stderr.writeln('');
+    stderr.writeln('Options:');
+    stderr.writeln('  --skills-path=<path>        Path to skills directory');
+    stderr.writeln('                              (default: .ai/skills)');
+    stderr.writeln('  -v, --verbose               Enable verbose logging');
+    stderr.writeln('  -h, --help                  Show this help message');
+    stderr.writeln('');
+    stderr.writeln('MCP Server Options:');
+    stderr.writeln('  --verbose                   Enable verbose logging');
+    stderr.writeln('');
+    stderr.writeln('Examples:');
+    stderr.writeln('  boost install                         # Install ServerPod Boost');
+    stderr.writeln('  boost skill:list                      # List all skills');
+    stderr.writeln('  boost skill:show create-endpoint      # Show skill details');
+    stderr.writeln('  boost skill:add username/repo         # List skills from a GitHub repo');
+    stderr.writeln('  boost skill:add username/repo skill   # Add a specific skill');
+    stderr.writeln('  boost skill:remove my-skill           # Remove a skill');
+    stderr.writeln('  boost skill:render create-endpoint    # Render skill to stdout');
+    stderr.writeln('  boost skill:render create-endpoint output.md  # Write to file');
+    stderr.writeln('  boost --verbose                       # Run MCP server with verbose logging');
   }
 }

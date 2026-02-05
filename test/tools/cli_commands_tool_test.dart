@@ -1,6 +1,5 @@
 import 'package:test/test.dart';
 import 'dart:io';
-import 'dart:convert';
 
 import '../../lib/tools/cli_commands_tool.dart';
 import '../../lib/mcp/mcp_protocol.dart';
@@ -841,12 +840,11 @@ class _MockCliCommandsTool extends CliCommandsTool {
 
       // Collect .dart files in bin directory (excluding this file itself)
       final dartFiles = binDirectory.listSync()
+          .whereType<File>()
           .where((entity) =>
-            entity is File &&
-            (entity as File).uri.pathSegments.last.endsWith('.dart') &&
-            !(entity as File).uri.pathSegments.last.contains('boost.dart') // Exclude main entry point
-          )
-          .cast<File>();
+            entity.uri.pathSegments.last.endsWith('.dart') &&
+            !entity.uri.pathSegments.last.contains('boost.dart') // Exclude main entry point
+          );
 
       final commands = <Map<String, dynamic>>[];
       final categories = <String>{};

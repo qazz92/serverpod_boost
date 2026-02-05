@@ -138,8 +138,6 @@ void main() {
     test('tools have JSON-serializable input schemas', () {
       // Verify all schemas can be converted to JSON
       for (final toolName in registry.toolNames) {
-        final tool = registry.getTool(toolName)!;
-
         try {
           // Try to encode schema (this will throw if not serializable)
           final encoded = true; // Placeholder for actual JSON encoding check

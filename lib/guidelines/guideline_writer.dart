@@ -183,12 +183,6 @@ class GuidelineWriter {
     final existingSections = _parseSections(existing);
     final generatedSections = _parseSections(generated);
 
-    // Find the separator in the generated content
-    final generatedContent = generatedSections.values.firstWhere(
-      (section) => section.contains('<serverpod-boost-guidelines>'),
-      orElse: () => '',
-    );
-
     // Build merged content
     final buffer = StringBuffer();
 
@@ -267,7 +261,6 @@ class GuidelineWriter {
 
     String? currentHeader;
     final currentContent = <String>[];
-    var foundHeader = false;
 
     for (final line in lines) {
       // Check for top-level header (# Header)
@@ -281,10 +274,8 @@ class GuidelineWriter {
         currentHeader = line.substring(1).trim().toLowerCase();
         currentContent.clear();
         currentContent.add(line); // Include the header line
-        foundHeader = true;
       } else {
         currentContent.add(line);
-        foundHeader = false;
       }
     }
 
@@ -294,51 +285,6 @@ class GuidelineWriter {
     }
 
     return sections;
-  }
-
-  /// Build markdown document from sections map
-  ///
-  /// Reconstructs a markdown document from the sections map,
-  /// preserving the order and formatting.
-  ///
-  /// The sections are sorted alphabetically by key to ensure
-  /// consistent output, but can be customized.
-  String _buildDocument(Map<String, String> sections) {
-    if (sections.isEmpty) {
-      return '';
-    }
-
-    final buffer = StringBuffer();
-
-    // Sort sections for consistent output
-    // Custom order can be defined here if needed
-    final sortedKeys = sections.keys.toList()..sort();
-
-    for (final key in sortedKeys) {
-      buffer.writeln('# ${_capitalizeHeader(key)}');
-      buffer.writeln();
-
-      final content = sections[key]!;
-      if (content.isNotEmpty) {
-        buffer.writeln(content);
-        buffer.writeln();
-      }
-    }
-
-    return buffer.toString().trimRight();
-  }
-
-  /// Capitalize the first letter of each word in header
-  ///
-  /// Converts lowercase headers back to title case.
-  /// Example: "claude code guidelines" -> "Claude Code Guidelines"
-  String _capitalizeHeader(String header) {
-    return header
-        .split(' ')
-        .map((word) => word.isEmpty
-            ? ''
-            : word[0].toUpperCase() + word.substring(1))
-        .join(' ');
   }
 
   /// Write guidelines to a specific file path

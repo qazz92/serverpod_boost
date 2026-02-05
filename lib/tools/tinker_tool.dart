@@ -66,13 +66,13 @@ class TinkerSecurityConfig {
 
 /// Message sent to isolate for execution
 class TinkerExecutionMessage {
-  final String code;
-  final String sendPort;
-
-  TinkerExecutionMessage({
+  const TinkerExecutionMessage({
     required this.code,
     required this.sendPort,
   });
+
+  final String code;
+  final String sendPort;
 
   Map<String, dynamic> toJson() => {
     'code': code,
@@ -82,19 +82,19 @@ class TinkerExecutionMessage {
 
 /// Result from isolate execution
 class TinkerExecutionResult {
-  final dynamic result;
-  final String output;
-  final String? error;
-  final int executionTime;
-  final int memoryUsed;
-
-  TinkerExecutionResult({
+  const TinkerExecutionResult({
     required this.result,
     required this.output,
     this.error,
     required this.executionTime,
     required this.memoryUsed,
   });
+
+  final dynamic result;
+  final String output;
+  final String? error;
+  final int executionTime;
+  final int memoryUsed;
 
   Map<String, dynamic> toJson() => {
     'result': result?.toString(),
@@ -244,10 +244,10 @@ num _parseAddSub() {
     final char = _expr[_pos];
     if (char == '+') {
       _pos++;
-      left = (left as num) + _parseMulDiv();
+      left = left + _parseMulDiv();
     } else if (char == '-') {
       _pos++;
-      left = (left as num) - _parseMulDiv();
+      left = left - _parseMulDiv();
     } else {
       break;
     }
@@ -261,10 +261,10 @@ num _parseMulDiv() {
     final char = _expr[_pos];
     if (char == '*') {
       _pos++;
-      left = (left as num) * _parseFactor();
+      left = left * _parseFactor();
     } else if (char == '/') {
       _pos++;
-      left = (left as num) / _parseFactor();
+      left = left / _parseFactor();
     } else {
       break;
     }
@@ -274,7 +274,7 @@ num _parseMulDiv() {
 
 num _parseFactor() {
   if (_pos >= _expr.length) {
-    throw FormatException('Unexpected end of expression');
+    throw const FormatException('Unexpected end of expression');
   }
 
   // Handle parentheses
@@ -282,7 +282,7 @@ num _parseFactor() {
     _pos++;
     final result = _parseAddSub();
     if (_pos >= _expr.length || _expr[_pos] != ')') {
-      throw FormatException('Missing closing parenthesis');
+      throw const FormatException('Missing closing parenthesis');
     }
     _pos++;
     return result;
@@ -466,7 +466,7 @@ For complex operations, use the ServerPod console directly.
 
       final isolateSendPort =
           await sendPortCompleter.future.timeout(timeout);
-      subscription?.cancel();
+      subscription.cancel();
 
       // Create response port for the result
       final responsePort = ReceivePort();

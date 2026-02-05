@@ -8,30 +8,21 @@
 /// - Error handling
 library serverpod_boost.test.tools.tinker_tool_test;
 
-import 'dart:async';
-import 'dart:io';
-
 import 'package:test/test.dart';
 
 import '../../lib/tools/tinker_tool.dart';
 import '../../lib/mcp/mcp_protocol.dart';
-import '../../lib/mcp/mcp_tool.dart';
 
 void main() {
   group('TinkerTool', () {
     late TinkerTool tool;
-    late String originalEnvValue;
 
     setUp(() {
       tool = TinkerTool();
-      // Save original environment value
-      originalEnvValue = Platform.environment['SERVERPOD_BOOST_TINKER_ENABLED'] ?? '';
     });
 
     tearDown(() {
-      // Restore original environment value
-      // Note: We can't actually modify environment variables in Dart,
-      // but we save/restore for clarity
+      // Cleanup
     });
 
     group('Tool Metadata', () {
@@ -575,7 +566,7 @@ void main() {
         );
 
         final stopwatch = Stopwatch()..start();
-        final response = await tool.execute(request);
+        await tool.execute(request);
         stopwatch.stop();
 
         // Should complete quickly

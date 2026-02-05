@@ -2,11 +2,8 @@
 library serverpod_boost.test.skills.github_skill_fetcher_test;
 
 import 'dart:io';
-import 'dart:convert';
 
 import 'package:test/test.dart';
-import 'package:serverpod_boost/skills/skill.dart';
-import 'package:serverpod_boost/skills/skill_metadata.dart';
 import 'package:serverpod_boost/skills/github_skill_fetcher.dart';
 import 'package:serverpod_boost/skills/skill_loader.dart';
 
@@ -52,9 +49,9 @@ void main() {
 
         // Fetch the skill - should use cache
         final skill = await fetcher.fetchSkill('test/repo', 'test-skill');
-        
+
         expect(skill, isNotNull);
-        expect(skill!.template, 'Cached template');
+        expect(skill.template, 'Cached template');
       });
     });
 

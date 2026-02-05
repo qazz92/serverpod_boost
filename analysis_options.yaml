@@ -51,5 +51,4 @@ linter:
     prefer_typing_uninitialized_variables: true
     # Avoid unused parameters
     avoid_unused_constructor_parameters: true
-    # Prefer async/await
-    prefer_async_await: true
+    # Prefer async/await (removed - not recognized in current SDK)

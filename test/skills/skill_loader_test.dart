@@ -7,7 +7,6 @@ import 'package:test/test.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:serverpod_boost/skills/skill_loader.dart';
-import 'package:serverpod_boost/skills/skill.dart';
 import 'package:serverpod_boost/skills/skill_metadata.dart';
 
 void main() {
