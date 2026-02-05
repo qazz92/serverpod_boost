@@ -11,11 +11,8 @@ import 'package:serverpod_boost/commands/skill_render_command.dart';
 import 'package:serverpod_boost/commands/skill_add_command.dart';
 import 'package:serverpod_boost/commands/skill_remove_command.dart';
 import 'package:serverpod_boost/commands/install_command.dart';
-import 'package:serverpod_boost/mcp/mcp_server.dart';
-import 'package:serverpod_boost/mcp/mcp_tool.dart';
-import 'package:serverpod_boost/mcp/mcp_transport.dart';
+import 'package:serverpod_boost/mcp/boost_mcp_server.dart';
 import 'package:serverpod_boost/serverpod/serverpod_locator.dart';
-import 'package:serverpod_boost/tool_registry.dart';
 
 /// CLI application for ServerPod Boost
 class CLIApp {
@@ -158,82 +155,53 @@ class CLIApp {
 
   /// Run the MCP server (default mode)
   Future<void> _runMCPServer(List<String> args) async {
-    final verbose = args.contains('--verbose') ||
-        args.contains('-v') ||
-        Platform.environment['SERVERPOD_BOOST_VERBOSE'] == 'true';
+    // Set verbose mode for server
+    if (args.contains('--verbose') || args.contains('-v')) {
+      Platform.environment['SERVERPOD_BOOST_VERBOSE'] = 'true';
+    }
 
-    // Detect ServerPod project
-    final project = ServerPodLocator.getProject();
+    try {
+      // Create and start server
+      final server = await BoostMcpServer.create();
+      await server.start();
 
-    if (project == null || !project.isValid) {
-      _logError('Not a valid ServerPod project!', verbose);
+      // Handle shutdown signals
+      ProcessSignal.sigint.watch().listen((_) async {
+        await _shutdown(server);
+      });
+
+      ProcessSignal.sigterm.watch().listen((_) async {
+        await _shutdown(server);
+      });
+
+      // Keep running until shutdown signal
+      // The server.start() handles all logging and stays alive
+    } on StateError catch (e) {
+      _logError(e.message, true);
       _logError(
-          'ServerPod Boost must be run from within a ServerPod project.', verbose);
-      _logError('', verbose);
-      _logError('Project structure should be:', verbose);
-      _logError('  monorepo_root/', verbose);
-      _logError('  ├── project_server/   (required)', verbose);
-      _logError('  ├── project_client/   (optional)', verbose);
-      _logError('  └── project_flutter/  (optional)', verbose);
-      _logError('', verbose);
+          'ServerPod Boost must be run from within a ServerPod project.', true);
+      _logError('', true);
+      _logError('Project structure should be:', true);
+      _logError('  monorepo_root/', true);
+      _logError('  ├── project_server/   (required)', true);
+      _logError('  ├── project_client/   (optional)', true);
+      _logError('  └── project_flutter/  (optional)', true);
+      _logError('', true);
       _logError(
           'Set SERVERPOD_BOOST_PROJECT_ROOT environment variable to override detection.',
-          verbose);
+          true);
+      exit(1);
+    } catch (e) {
+      _logError('Failed to start MCP server: $e', true);
       exit(1);
     }
-
-    // Create server configuration with project info
-    final config = MCPServerConfig(
-      name: 'serverpod-boost',
-      version: '0.1.0',
-    );
-
-    // Create stdio transport
-    final transport = StdioTransport();
-
-    // Create server with tool registry
-    final registry = McpToolRegistry();
-    BoostToolRegistry.registerAll(registry);
-
-    final server = MCPServer(
-      transport: transport,
-      config: config,
-      toolRegistry: registry,
-    );
-
-    // Handle shutdown signals
-    ProcessSignal.sigint.watch().listen((_) async {
-      await _shutdown(server, verbose);
-    });
-
-    ProcessSignal.sigterm.watch().listen((_) async {
-      await _shutdown(server, verbose);
-    });
-
-    // Start the server
-    _log('ServerPod Boost v${config.version}', verbose);
-    _log('Project: ${project.rootPath}', verbose);
-    _log('Server: ${project.serverPath}', verbose);
-    _log('Tools: ${registry.count}', verbose);
-    _log('', verbose);
-    _log('MCP server ready, listening for requests...', verbose);
-
-    await server.start();
-
-    // Keep running until shutdown signal
   }
 
-  Future<void> _shutdown(MCPServer server, bool verbose) async {
-    _log('', verbose);
-    _log('Shutting down ServerPod Boost...', verbose);
+  Future<void> _shutdown(BoostMcpServer server) async {
+    stderr.writeln('');
+    stderr.writeln('Shutting down ServerPod Boost...');
     await server.stop();
     exit(0);
-  }
-
-  void _log(String message, bool verbose) {
-    if (verbose) {
-      stderr.writeln('[INFO] $message');
-    }
   }
 
   void _logError(String message, bool verbose) {

@@ -1,22 +1,16 @@
-# ServerPod Boost V2
+# ServerPod Boost
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Dart](https://img.shields.io/badge/dart-3.8.0+-blue.svg)](https://dart.dev)
-[![Tests](https://img.shields.io/badge/tests-277%20passing-brightgreen.svg)](https://github.com/serverpod/boost)
+[![Tests](https://img.shields.io/badge/tests-400%2B-brightgreen.svg)](https://github.com/serverpod/boost)
 
 > AI acceleration for ServerPod development via MCP (Model Context Protocol)
 
-ServerPod Boost V2 is an MCP server that provides AI assistants (like Claude) with deep semantic understanding of ServerPod projects, enabling high-quality code generation through context-aware tool access and an extensible skills system.
+ServerPod Boost is an MCP server that provides AI assistants (like Claude) with deep semantic understanding of ServerPod projects, enabling high-quality code generation through context-aware tool access.
 
-## What's New in V2?
+## Version 0.1.0 - Foundation Release
 
-- **Skills System**: 8 built-in skills for common workflows
-- **Remote Skills**: Load skills from GitHub repositories
-- **Interactive Installation**: `boost install` CLI with auto-configuration
-- **File Provisioning**: Auto-generate AGENTS.md and CLAUDE.md
-- **Smart Merge**: Intelligent merging of documentation files
-- **MCP Auto-Config**: Automatic Claude Desktop configuration
-- **277 Tests**: Comprehensive test coverage
+This is the first public release of ServerPod Boost, providing the core infrastructure for AI-assisted ServerPod development. The skills system framework is in place, with pre-built skills coming in future releases.
 
 ## What is ServerPod Boost?
 
@@ -28,8 +22,7 @@ Inspired by [Laravel Boost](https://github.com/joelbutcher/laravel_boost), Serve
 - **Database Context**: Access migration files and database schemas
 - **Configuration Access**: Read all YAML config files
 - **Code Search**: Full-text search across source code
-- **Extensible Skills**: Create and share reusable workflows
-- **Remote Capabilities**: Load skills from GitHub repositories
+- **Skills Infrastructure**: Framework for extensible workflows (pre-built skills coming soon)
 
 ## Quick Start
 
@@ -93,7 +86,7 @@ Ask Claude anything about your ServerPod project:
 
 ## Features
 
-### 14 Built-in Tools
+### 20 Built-in Tools
 
 | Tool | Description |
 |------|-------------|
@@ -111,43 +104,24 @@ Ask Claude anything about your ServerPod project:
 | `search_code` | Search code content |
 | `call_endpoint` | Test endpoints |
 | `service_config` | Service configuration |
+| `list_skills` | List available skills |
+| `get_skill` | Get skill content |
+| `log_reader` | Read ServerPod logs |
+| `database_query` | Query database |
+| `cli_commands` | List CLI commands |
+| `tinker` | Execute Dart code |
 
-### 8 Built-in Skills
+### Skills Infrastructure
 
-Skills are pre-built workflows that combine multiple tools for common tasks:
-
-| Skill | Description |
-|-------|-------------|
-| `core` | Core ServerPod development patterns |
-| `endpoints` | Endpoint creation and patterns |
-| `models` | Protocol model definitions |
-| `migrations` | Database migration patterns |
-| `testing` | Testing best practices |
-| `authentication` | Authentication patterns |
-| `webhooks` | Webhook handling |
-| `redis` | Redis caching |
-
-### Remote Skills from GitHub
-
-Load skills from any GitHub repository:
-
-```bash
-boost skill:add username/repo skill-name
-boost skill:list
-boost skill:show skill-name
-```
-
-See [doc/SKILLS_DEVELOPMENT_GUIDE.md](doc/SKILLS_DEVELOPMENT_GUIDE.md) for creating and sharing skills.
+ServerPod Boost includes the infrastructure for an extensible skills system. The framework is in place for creating and managing reusable workflows that combine multiple tools. Pre-built skills will be available in future releases.
 
 ## CLI Commands
 
 ```bash
-boost install                  # Install everything (guidelines, skills, MCP)
+boost install                  # Install everything (guidelines, MCP config)
+boost install --interactive    # Interactive installation with options
 boost skill:list               # List available skills
 boost skill:show <name>        # Show skill details
-boost skill:render <name>      # Render skill
-boost skill:add <repo> [skill] # Add remote skill from GitHub
-boost skill:remove <name>      # Remove skill
 ```
 
 ## Project Structure
@@ -172,8 +146,7 @@ your_project/
 ├── .ai/
 │   ├── boost/
 │   │   ├── bin/              # Boost executable
-│   │   ├── skills/           # Local skills
-│   │   │   └── default/      # 8 built-in skills
+│   │   ├── skills/           # Local skills directory
 │   │   └── config/           # Local configuration
 │   ├── AGENTS.md             # Generated AI documentation
 │   └── CLAUDE.md             # Generated Claude instructions
@@ -210,17 +183,16 @@ boost models
 
 - **[사용자 가이드 (User Guide)](doc/USER_GUIDE.md)** - 완전한 사용 설명서 (설치, 빠른 시작, MCP 도구, 스킬 시스템, CLI 명령어)
 - **[CLI 명령어 레퍼런스 (CLI Reference)](doc/CLI_REFERENCE.md)** - 모든 CLI 명령어 상세 설명
-- **[MCP 도구 레퍼런스 (MCP Tools Reference)](doc/MCP_TOOLS_REFERENCE.md)** - 14개 MCP 도구 상세 문서
+- **[MCP 도구 레퍼런스 (MCP Tools Reference)](doc/MCP_TOOLS_REFERENCE.md)** - 20개 MCP 도구 상세 문서
 - **[스킬 개발 가이드 (Skills Development Guide)](doc/SKILLS_DEVELOPMENT_GUIDE.md)** - 커스텀 스킬 만들기
 - [AGENTS.md](AGENTS.md) - AI 에이전트를 위한 프로젝트 문서
 
 ## Testing
 
-Boost V2 includes 277 tests covering:
+Boost includes 400+ tests covering:
 
-- Tool functionality (14 tools × multiple scenarios)
-- Skills system (8 built-in skills)
-- Remote skill loading
+- Tool functionality (20 tools × multiple scenarios)
+- Skills system infrastructure
 - File provisioning
 - MCP protocol compliance
 - Error handling and edge cases
@@ -230,7 +202,6 @@ Boost V2 includes 277 tests covering:
 dart test
 
 # Run specific test suite
-dart test test/skills_composer_simple.dart
 dart test test/tools/tools_integration_test.dart
 ```
 
@@ -260,4 +231,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for the ServerPod community**
 
-**Version**: 2.0.0 | **Tests**: 277 passing | **Tools**: 14 | **Skills**: 8
+**Version**: 0.1.0 | **Tests**: 400+ | **Tools**: 20

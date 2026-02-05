@@ -1,4 +1,0 @@
-# Dart test configuration
-# Run tests serially to avoid Directory.current conflicts
-preset: default
-concurrency: 1

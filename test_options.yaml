@@ -1,4 +1,0 @@
-test_on: "vm"
-# Use `dart test --version` to find the recommended value
-preserve_output: true
-timeout: 30s

@@ -70,6 +70,46 @@ class ServerPodProject {
 
   /// Create from detected project root
   static ServerPodProject? detect([String? currentPath]) {
+    // First, check if SERVERPOD_BOOST_PROJECT_ROOT is set
+    final projectRootEnv = Platform.environment['SERVERPOD_BOOST_PROJECT_ROOT'];
+    if (projectRootEnv != null && projectRootEnv.isNotEmpty) {
+      final rootDir = Directory(projectRootEnv);
+      if (rootDir.existsSync()) {
+        final root = projectRootEnv;
+
+        // Find server package
+        final serverPath = ProjectRoot.findServerPackage(root);
+
+        // If no server package found, this is not a valid ServerPod project
+        if (serverPath == null) {
+          return null;
+        }
+
+        final clientPath = ProjectRoot.findClientPackage(root);
+
+        // Find flutter package
+        String? flutterPath;
+        final dir = Directory(root);
+        for (final entity in dir.listSync()) {
+          if (entity is Directory) {
+            final name = p.basename(entity.path);
+            if (name.endsWith('_flutter')) {
+              flutterPath = entity.path;
+              break;
+            }
+          }
+        }
+
+        return ServerPodProject(
+          rootPath: root,
+          serverPath: serverPath,
+          clientPath: clientPath,
+          flutterPath: flutterPath,
+        );
+      }
+    }
+
+    // Fall back to auto-detection
     final root = ProjectRoot.detect(currentPath);
 
     if (!ProjectRoot.isValidServerPodProject(root)) {

@@ -1,3 +1,4 @@
+@Deprecated('Use package:mcp_server instead. This file will be removed in v1.0.0')
 /// MCP Protocol implementation based on JSON-RPC 2.0
 ///
 /// This file contains the core type definitions for the Model Context Protocol (MCP),
@@ -25,8 +26,11 @@ class McpProtocol {
 ///
 /// Represents a JSON-RPC 2.0 request object with an ID, method name, and optional parameters.
 class McpRequest {
-  /// Unique request identifier (string for simplicity)
-  final String id;
+  /// Unique request identifier (can be string, number, or null)
+  final Object id;
+
+  /// ID as string (for convenience)
+  String get idString => id.toString();
 
   /// Method name to invoke
   final String method;
@@ -42,8 +46,13 @@ class McpRequest {
 
   /// Create request from JSON map
   factory McpRequest.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    if (id == null) {
+      throw FormatException('Request id is required');
+    }
+
     return McpRequest(
-      id: json['id'] as String,
+      id: id,
       method: json['method'] as String,
       params: json['params'] as Map<String, dynamic>?,
     );
@@ -83,8 +92,8 @@ class McpRequest {
 ///
 /// Represents a JSON-RPC 2.0 response object with either a result or an error.
 class McpResponse {
-  /// Request ID this response corresponds to
-  final String id;
+  /// Request ID this response corresponds to (can be string, number, or null)
+  final Object id;
 
   /// Successful result data (null if error)
   final dynamic result;
@@ -99,7 +108,7 @@ class McpResponse {
   }) : assert(result != null || error != null, 'Either result or error must be provided');
 
   /// Create a successful response
-  factory McpResponse.result(String id, dynamic result) {
+  factory McpResponse.result(Object id, dynamic result) {
     return McpResponse(
       id: id,
       result: result,
@@ -115,7 +124,7 @@ class McpResponse {
   }
 
   /// Create an error response
-  factory McpResponse.error(String id, int code, String message, {String? data}) {
+  factory McpResponse.error(Object id, int code, String message, {String? data}) {
     return McpResponse(
       id: id,
       error: McpError(code: code, message: message, data: data),
@@ -123,7 +132,7 @@ class McpResponse {
   }
 
   /// Create a parse error response
-  factory McpResponse.parseError(String id) {
+  factory McpResponse.parseError(Object id) {
     return McpResponse.error(
       id,
       McpProtocol.errorParseError,
@@ -132,7 +141,7 @@ class McpResponse {
   }
 
   /// Create an invalid request error response
-  factory McpResponse.invalidRequest(String id) {
+  factory McpResponse.invalidRequest(Object id) {
     return McpResponse.error(
       id,
       McpProtocol.errorInvalidRequest,
@@ -141,7 +150,7 @@ class McpResponse {
   }
 
   /// Create a method not found error response
-  factory McpResponse.methodNotFound(String id) {
+  factory McpResponse.methodNotFound(Object id) {
     return McpResponse.error(
       id,
       McpProtocol.errorMethodNotFound,
@@ -150,7 +159,7 @@ class McpResponse {
   }
 
   /// Create an invalid params error response
-  factory McpResponse.invalidParams(String id, String detail) {
+  factory McpResponse.invalidParams(Object id, String detail) {
     return McpResponse.error(
       id,
       McpProtocol.errorInvalidParams,
@@ -159,7 +168,7 @@ class McpResponse {
   }
 
   /// Create an internal error response
-  factory McpResponse.internalError(String id, String message) {
+  factory McpResponse.internalError(Object id, String message) {
     return McpResponse.error(
       id,
       McpProtocol.errorInternalError,

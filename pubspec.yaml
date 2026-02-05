@@ -4,10 +4,10 @@ description: >-
   AI acceleration for ServerPod development via MCP (Model Context Protocol).
   Provides AI assistants with deep context awareness of ServerPod projects,
   enabling high-quality code generation through semantic understanding.
-homepage: https://github.com/your-org/serverpod_boost
-repository: https://github.com/your-org/serverpod_boost
-issue_tracker: https://github.com/your-org/serverpod_boost/issues
-documentation: https://github.com/your-org/serverpod_boost/blob/main/docs/USER_GUIDE.md
+homepage: # TODO: Set actual homepage URL
+repository: # TODO: Set actual repository URL
+issue_tracker: # TODO: Set actual issue tracker URL
+documentation: # TODO: Set actual documentation URL
 
 environment:
   sdk: '>=3.8.0 <4.0.0'
@@ -20,6 +20,8 @@ dependencies:
   args: ^2.4.2
   console: ^4.1.0
   http: ^1.6.0
+  postgres: ^3.0.0
+  mcp_server: ^1.0.3
 
 dev_dependencies:
   lints: ^3.0.0

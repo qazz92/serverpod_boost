@@ -21,7 +21,7 @@ void main() {
     });
 
     test('all tools are registered', () {
-      expect(registry.count, equals(14));
+      expect(registry.count, equals(16));
 
       final toolNames = registry.toolNames;
 
@@ -42,6 +42,10 @@ void main() {
       expect(toolNames, contains('search_code'));
       expect(toolNames, contains('call_endpoint'));
       expect(toolNames, contains('service_config'));
+
+      // Skill tools
+      expect(toolNames, contains('list_skills'));
+      expect(toolNames, contains('get_skill'));
     });
 
     test('all tools have valid metadata', () {

@@ -1,3 +1,4 @@
+@Deprecated('Use package:mcp_server instead. This file will be removed in v1.0.0')
 /// MCP Transport layer for stdio communication
 library serverpod_boost.mcp.mcp_transport;
 
@@ -55,12 +56,16 @@ class StdioTransport implements MCPTransport {
           _handleLine,
           onError: (error) {
             if (_running) {
-              stderr.writeln('Stdin error: $error');
+              // Silently ignore errors in non-verbose mode
+              // stderr.writeln('Stdin error: $error');
             }
           },
           onDone: () {
+            // Don't auto-stop on EOF - MCP servers should stay running
+            // The client will close the connection when done
             if (_running) {
-              stop();
+              _stdinSubscription?.cancel();
+              _stdinSubscription = null;
             }
           },
           cancelOnError: false,

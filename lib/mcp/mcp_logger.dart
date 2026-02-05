@@ -70,9 +70,16 @@ class McpLogger {
   /// Create a logger from environment variables
   ///
   /// Reads configuration from:
+  /// - SERVERPOD_BOOST_VERBOSE: set to 'true' to enable logging (default: false)
   /// - SERVERPOD_BOOST_LOG_LEVEL: debug, info, warning, error (default: info)
   /// - SERVERPOD_BOOST_NO_COLOR: set to 'true' to disable colors
+  ///
+  /// When SERVERPOD_BOOST_VERBOSE is not set or is 'false', only errors are logged
+  /// to avoid interfering with JSON-RPC protocol communication over stderr.
   static McpLogger create() {
+    // Check verbose flag first - if not verbose, only log errors
+    final verbose = Platform.environment['SERVERPOD_BOOST_VERBOSE'] == 'true';
+
     final levelStr = Platform.environment['SERVERPOD_BOOST_LOG_LEVEL'] ?? 'info';
     McpLogLevel level;
 
@@ -93,8 +100,11 @@ class McpLogger {
         level = McpLogLevel.info;
     }
 
+    // If not verbose, only show errors to avoid JSON-RPC interference
+    final effectiveLevel = verbose ? level : McpLogLevel.error;
+
     return McpLogger(
-      level: level,
+      level: effectiveLevel,
       useColors: Platform.environment['SERVERPOD_BOOST_NO_COLOR'] != 'true',
     );
   }

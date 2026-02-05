@@ -18,7 +18,7 @@ class ClaudeCodeAgent extends Agent {
   String get displayName => 'Claude Code';
 
   @override
-  String get configPath => '.claude/mcp.json';
+  String get configPath => '.mcp.json';
 
   @override
   String? get userConfigPath {
@@ -42,7 +42,7 @@ class ClaudeCodeAgent extends Agent {
             'run',
             'serverpod_boost:boost',
           ],
-          'cwd': project.rootPath,
+          'cwd': project.serverPath,
           'env': {
             'SERVERPOD_BOOST_PROJECT_ROOT': project.rootPath,
             'SERVERPOD_BOOST_VERBOSE': 'false',
@@ -82,8 +82,8 @@ class ClaudeCodeAgent extends Agent {
   @override
   Map<String, dynamic> projectDetectionConfig() {
     return {
-      'paths': <String>['.claude'],
-      'files': <String>['.claude/mcp.json', 'CLAUDE.md'],
+      'paths': <String>['.mcp.json'],
+      'files': <String>['.mcp.json', 'CLAUDE.md'],
     };
   }
 

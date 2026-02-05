@@ -1,3 +1,4 @@
+@Deprecated('Use package:mcp_server instead. This file will be removed in v1.0.0')
 /// MCP Server - Main server implementation
 ///
 /// This class implements the MCP server that handles incoming requests

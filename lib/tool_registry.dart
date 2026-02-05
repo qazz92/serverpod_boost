@@ -10,6 +10,10 @@ library serverpod_boost.tool_registry;
 
 import 'mcp/mcp_tool.dart';
 import 'tools/tools.dart';
+import 'tools/cli_commands_tool.dart';
+import 'tools/database_query_tool.dart';
+import 'tools/log_reader_tool.dart';
+import 'tools/tinker_tool.dart';
 
 /// Tool Registry - Manual registration approach
 ///
@@ -39,6 +43,20 @@ class BoostToolRegistry {
     'search_code': SearchCodeTool(),
     'call_endpoint': CallEndpointTool(),
     'service_config': ServiceConfigTool(),
+    'log_reader': LogReaderTool(),
+
+    // Skill Tools (Tier 3)
+    'list_skills': ListSkillsTool(),
+    'get_skill': GetSkillTool(),
+
+    // Database Tools (Tier 4)
+    'database_query': DatabaseQueryTool(),
+
+    // CLI Tools (Tier 5)
+    'cli_commands': CliCommandsTool(),
+
+    // Developer Tools (Tier 6)
+    'tinker': TinkerTool(),
   };
 
   /// Get tool by name

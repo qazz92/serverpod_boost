@@ -174,16 +174,71 @@ class GuidelineComposer {
   /// Get guidelines for Claude Code
   String _getClaudeCodeGuidelines() {
     return '''
-# Claude Code Guidelines for ServerPod
+# ServerPod Boost - AI Assistant Guidelines
 
-You are Claude Code, an AI programming assistant working with a ServerPod project.
+You are an AI programming assistant working with a ServerPod project enhanced with ServerPod Boost.
+
+## Project Overview
+
+This project uses **ServerPod Boost** to provide AI-powered development tools and skills via MCP (Model Context Protocol) tools.
+
+## Available MCP Tools
+
+ServerPod Boost provides the following MCP tools to help you understand and work with this project:
+
+### Essential Tools
+- **application_info**: Get comprehensive project information (versions, endpoints, models, database config)
+- **list_endpoints**: List all endpoints with their methods
+- **endpoint_methods**: Get detailed method signatures for a specific endpoint
+- **list_models**: List all protocol models with their fields
+- **model_inspector**: Get detailed information about a specific model
+- **database_schema**: Get the current database schema
+- **migration_scanner**: List and analyze migrations
+
+### Code Navigation
+- **project_structure**: Get the complete project file tree
+- **find_files**: Search for files by name pattern
+- **read_file**: Read file contents
+- **search_code**: Search for code patterns across the project
+
+### Runtime Tools
+- **call_endpoint**: Test endpoint methods directly
+- **service_config**: Get service configuration details
+
+### AI Skills System
+- **list_skills**: List all available AI skills for ServerPod development
+- **get_skill**: Retrieve the full content of a specific skill
+
+## Using the Skills System
+
+ServerPod Boost includes a dynamic skills system that provides specialized knowledge for different ServerPad development tasks:
+
+1. **Discover available skills**:
+   - Use the \`list_skills\` MCP tool to see all available skills
+   - Skills are organized by category (serverpod, remote, etc.)
+   - Each skill has tags, examples, and triggers for easy discovery
+
+2. **Get skill content**:
+   - Use the \`get_skill\` MCP tool with a skill name to retrieve its full content
+   - Skills contain domain knowledge, best practices, and code patterns
+   - Skills are dynamically loaded from the project\`.ai/skills\` directory
+
+3. **Common skill categories**:
+   - **core**: Core ServerPod concepts and architecture
+   - **endpoints**: Endpoint development patterns
+   - **models**: Model design and validation
+   - **migrations**: Database migration strategies
+   - **testing**: Testing patterns and best practices
+   - **redis**: Caching with Redis
+   - **authentication**: Auth implementation patterns
+   - **webhooks**: Webhook handling
 
 ## Core Principles
 
 1. **Understand the Project Context**
-   - Read the project context below before making changes
+   - Start by using \`application_info\` to understand the project
    - Consider existing endpoints, models, and migrations
-   - Respect the project's architecture and patterns
+   - Respect the project\`s architecture and patterns
 
 2. **ServerPod Best Practices**
    - Endpoints should be focused and single-purpose
@@ -209,51 +264,42 @@ You are Claude Code, an AI programming assistant working with a ServerPod projec
    - Test changes locally before committing
    - Use version control branches
 
-## Working with ServerPod
-
-### Endpoints
-- Endpoints are in \`lib/src/endpoints/\`
-- Each endpoint extends \`Endpoint\`
-- Methods are annotated with \`@ApiCall\`
-- Use typed parameters and return types
-
-### Models
-- Models are in \`lib/src/models/\`
-- Use \`@ClassDefinition\` annotation
-- Define fields with proper types
-- Implement serialization via \`toJson\`/\`fromJson\`
-
-### Migrations
-- Migrations are in \`migrations/\`
-- Create migrations for schema changes
-- Test migrations on copy of production data
-- Document breaking changes
-
-### Database
-- Use \`session.db\` for database access
-- Queries return \`List<Map<String, dynamic>>\`
-- Use parameterized queries to prevent SQL injection
-- Consider performance for large datasets
-
-## Common Tasks
+## Common Workflow
 
 ### Adding a New Endpoint
-1. Create endpoint file in \`lib/src/endpoints/\`
-2. Extend \`Endpoint\` class
-3. Define methods with \`@ApiCall\`
-4. Add tests in \`test/\`
+1. Use \`list_skills\` to find the \"endpoints\" skill
+2. Use \`get_skill\` with \"endpoints\" to get endpoint development patterns
+3. Create endpoint file in \`lib/src/endpoints/\`
+4. Extend \`Endpoint\` class and define methods with \`@ApiCall\`
+5. Add tests in \`test/\`
 
 ### Modifying a Model
-1. Update model definition
-2. Create migration for schema change
-3. Update related endpoints
-4. Update tests
+1. Use \`model_inspector\` to understand the current model structure
+2. Use \`get_skill\` with \"models\" to get model design patterns
+3. Update model definition
+4. Create migration for schema change
+5. Update related endpoints and tests
 
 ### Debugging
 - Check ServerPod logs in \`logs/\`
 - Use database query logging
 - Enable debug mode in config
-- Use print statements for quick checks
+- Use \`search_code\` to find usages of problematic code
+
+## Skills Reference
+
+The skills system is designed to be extensible. Skills are stored in:
+\`.ai/skills/{category}/{skill}/SKILL.md.mustache\`
+
+To add new skills:
+1. Create a new directory under \`.ai/skills/\`
+2. Add a \`SKILL.md.mustache\` file with the skill content
+3. Optionally add a \`meta.yaml\` with metadata (tags, examples, triggers)
+4. The skill will be automatically discovered by \`list_skills\`
+
+---
+
+**Note**: This project is enhanced with ServerPod Boost. Use the provided MCP tools to access project information and skills dynamically.
 ''';
   }
 
