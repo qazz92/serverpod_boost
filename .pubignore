@@ -1,0 +1,27 @@
+# Build outputs
+build/
+.dart_tool/
+.packages
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+coverage/
+
+# Logs
+*.log
+
+# Documentation (source, not published)
+doc/examples/
+*.md.bak

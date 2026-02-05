@@ -1,0 +1,61 @@
+#!/bin/bash
+# Boost command wrapper - Quick access to ServerPod Boost CLI
+# Usage: boost [command] [args]
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Find the boost installation
+find_boost_dir() {
+    local current_dir="$(pwd)"
+
+    # Search up the directory tree for .ai/boost
+    while [[ "$current_dir" != "/" ]]; do
+        if [[ -d "$current_dir/.ai/boost" ]]; then
+            echo "$current_dir/.ai/boost"
+            return 0
+        fi
+        current_dir="$(dirname "$current_dir")"
+    done
+
+    return 1
+}
+
+BOOST_DIR=$(find_boost_dir)
+
+if [[ -z "$BOOST_DIR" ]]; then
+    echo -e "${RED}Error: ServerPod Boost not found${NC}"
+    echo ""
+    echo "Could not find .ai/boost directory in current or parent directories."
+    echo ""
+    echo "To install ServerPod Boost in your project:"
+    echo "  ${YELLOW}bash /path/to/serverpod_boost/bin/install.sh${NC}"
+    exit 1
+fi
+
+# Check if dart is available
+if ! command -v dart &> /dev/null; then
+    echo -e "${RED}Error: Dart not found${NC}"
+    echo ""
+    echo "Dart is required to run ServerPod Boost."
+    echo "Install Dart from: https://dart.dev/get-dart"
+    exit 1
+fi
+
+# Check if dependencies are installed
+if [[ ! -d "$BOOST_DIR/.dart_tool" ]]; then
+    echo -e "${YELLOW}Boost dependencies not installed. Installing...${NC}"
+    (cd "$BOOST_DIR" && dart pub get)
+    echo -e "${GREEN}✓ Dependencies installed${NC}"
+    echo ""
+fi
+
+# Run the boost CLI
+cd "$BOOST_DIR"
+dart run bin/boost.dart "$@"

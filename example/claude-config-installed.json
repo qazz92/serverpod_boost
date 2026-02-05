@@ -1,0 +1,16 @@
+{
+  "_comment": "Example configuration when Boost is installed in the project (.ai/boost/)",
+  "mcpServers": {
+    "serverpod-boost": {
+      "command": "dart",
+      "args": [
+        "run",
+        ".ai/boost/bin/boost.dart"
+      ],
+      "cwd": "/Users/musinsa/always_summer/pilly",
+      "env": {
+        "SERVERPOD_BOOST_VERBOSE": "true"
+      }
+    }
+  }
+}

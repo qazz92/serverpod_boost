@@ -1,0 +1,232 @@
+/// MCP Server - Main server implementation
+///
+/// This class implements the MCP server that handles incoming requests
+/// and manages the tool registry.
+library serverpod_boost.mcp.mcp_server;
+
+import 'dart:async';
+import 'dart:io';
+
+import 'mcp_protocol.dart';
+import 'mcp_prompt.dart';
+import 'mcp_resource.dart';
+import 'mcp_transport.dart';
+import 'mcp_tool.dart';
+import 'mcp_logger.dart';
+
+/// Server configuration for MCP
+class MCPServerConfig {
+  /// Server name
+  final String name;
+
+  /// Server version
+  final String version;
+
+  /// Server protocol version
+  final String protocolVersion;
+
+  MCPServerConfig({
+    required this.name,
+    required this.version,
+    this.protocolVersion = '2024-11-05',
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'version': version,
+      'protocolVersion': protocolVersion,
+    };
+  }
+}
+
+/// Main MCP server implementation
+class MCPServer {
+  final MCPTransport _transport;
+  final McpToolRegistry _toolRegistry;
+  final McpResourceRegistry _resourceRegistry;
+  final McpPromptRegistry _promptRegistry;
+  final MCPServerConfig _config;
+  final McpLogger _logger;
+  bool _running = false;
+  bool _initialized = false;
+  StreamSubscription<McpRequest>? _requestSubscription;
+
+  MCPServer({
+    required MCPTransport transport,
+    required MCPServerConfig config,
+    McpToolRegistry? toolRegistry,
+    McpResourceRegistry? resourceRegistry,
+    McpPromptRegistry? promptRegistry,
+    McpLogger? logger,
+  })  : _transport = transport,
+        _config = config,
+        _toolRegistry = toolRegistry ?? McpToolRegistry(),
+        _resourceRegistry = resourceRegistry ?? McpResourceRegistry(),
+        _promptRegistry = promptRegistry ?? McpPromptRegistry(),
+        _logger = logger ?? McpLogger.create();
+
+  /// Get the tool registry for adding tools
+  McpToolRegistry get tools => _toolRegistry;
+
+  /// Get the resource registry for adding resources
+  McpResourceRegistry get resources => _resourceRegistry;
+
+  /// Get the prompt registry for adding prompts
+  McpPromptRegistry get prompts => _promptRegistry;
+
+  /// Get server config
+  MCPServerConfig get config => _config;
+
+  /// Start the MCP server
+  ///
+  /// Begins listening for incoming requests and processing them
+  Future<void> start() async {
+    if (_running) {
+      _logger.warning('Server already running');
+      return;
+    }
+
+    _logger.info('Starting ${_config.name} v${_config.version}...');
+    _running = true;
+
+    await _transport.start();
+    _logger.debug('Transport started');
+
+    // Listen for incoming requests
+    _requestSubscription = _transport.requestStream.listen(
+      _handleRequest,
+      onError: (error) {
+        _logger.error('Request handling error: $error');
+      },
+      cancelOnError: false,
+    );
+
+    _logger.info('Server started with ${_toolRegistry.count} tools, ${_resourceRegistry.count} resources, ${_promptRegistry.count} prompts');
+  }
+
+  /// Stop the MCP server
+  ///
+  /// Gracefully shuts down the server
+  Future<void> stop() async {
+    if (!_running) return;
+    _running = false;
+    _initialized = false;
+
+    await _requestSubscription?.cancel();
+    await _transport.stop();
+  }
+
+  /// Handle an incoming MCP request
+  ///
+  /// Parameters:
+  /// - [request]: The incoming MCP request to process
+  ///
+  /// Returns the response for the request
+  Future<void> _handleRequest(McpRequest request) async {
+    McpResponse response;
+
+    try {
+      switch (request.method) {
+        case 'initialize':
+          response = await _initialize(request);
+          break;
+        case 'tools/list':
+          response = await _listTools(request);
+          break;
+        case 'tools/call':
+          response = await _callTool(request);
+          break;
+        case 'prompts/list':
+          response = await _listPrompts(request);
+          break;
+        case 'prompts/get':
+          response = await _getPrompt(request);
+          break;
+        default:
+          response = McpResponse.methodNotFound(request.id);
+      }
+    } catch (e) {
+      response = McpResponse.internalError(request.id, e.toString());
+    }
+
+    await _transport.sendResponse(response);
+  }
+
+  /// Initialize the MCP server
+  ///
+  /// Handles the initialize method from the MCP protocol
+  Future<McpResponse> _initialize(McpRequest request) async {
+    _initialized = true;
+
+    return McpResponse.result(request.id, {
+      'protocolVersion': _config.protocolVersion,
+      'serverInfo': _config.toJson(),
+      'capabilities': _getCapabilities(),
+    });
+  }
+
+  /// List available tools
+  ///
+  /// Handles the tools/list method from the MCP protocol
+  Future<McpResponse> _listTools(McpRequest request) async {
+    if (!_initialized) {
+      return McpResponse.error(
+        request.id,
+        -32000,
+        'Server not initialized',
+      );
+    }
+
+    return McpResponse.result(request.id, {
+      'tools': _toolRegistry.toolMetadata,
+    });
+  }
+
+  /// Call a tool
+  ///
+  /// Handles the tools/call method from the MCP protocol
+  Future<McpResponse> _callTool(McpRequest request) async {
+    if (!_initialized) {
+      return McpResponse.error(
+        request.id,
+        -32000,
+        'Server not initialized',
+      );
+    }
+
+    final params = request.params;
+    if (params == null || !params.containsKey('name')) {
+      return McpResponse.invalidParams(request.id, 'Missing tool name');
+    }
+
+    final toolName = params['name'] as String;
+    final toolParams = params['arguments'] as Map<String, dynamic>?;
+
+    // Create a new request for the tool
+    final toolRequest = McpRequest(
+      id: request.id,
+      method: toolName,
+      params: toolParams,
+    );
+
+    return _toolRegistry.execute(toolName, toolRequest);
+  }
+
+  /// Get server capabilities
+  ///
+  /// Returns the capabilities supported by this server
+  Map<String, dynamic> _getCapabilities() {
+    return {
+      'tools': {},
+      'resources': {},
+      'prompts': {},
+    };
+  }
+
+  /// Check if server is running
+  bool get isRunning => _running;
+
+  /// Check if server is initialized
+  bool get isInitialized => _initialized;
+}

@@ -1,0 +1,17 @@
+{
+  "_comment": "Example Claude Desktop MCP configuration for ServerPod Boost",
+  "mcpServers": {
+    "serverpod-boost": {
+      "command": "dart",
+      "args": [
+        "run",
+        "/Users/musinsa/always_summer/serverpod_boost/bin/boost.dart"
+      ],
+      "env": {
+        "SERVERPOD_BOOST_PROJECT_ROOT": "/Users/musinsa/always_summer/pilly",
+        "SERVERPOD_BOOST_VERBOSE": "true",
+        "SERVERPOD_BOOST_LOG_LEVEL": "debug"
+      }
+    }
+  }
+}

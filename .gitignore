@@ -1,0 +1,61 @@
+# ServerPod Boost .gitignore
+
+# ServerPod Boost specific AI development directories
+.ai/
+.omc/
+.claude/
+
+# MCP configuration files
+.mcp.json
+.claude/mcp.json
+.opencode/
+
+# Development IDE files
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# Build and cache directories
+build/
+coverage/
+
+# Dart gitignore
+
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Test results
+test/.test_coverage.dart
+test/.test_reports/

@@ -1,0 +1,55 @@
+# Dart linting rules for ServerPod Boost
+#
+# This file configures the analyzer and linter for the project.
+
+include: package:lints/recommended.yaml
+
+analyzer:
+  errors:
+    # Treat missing return values as errors
+    missing_return: error
+    # Treat missing required parameters as errors
+    missing_required_param: error
+    # Treat dead code as warnings
+    dead_code: warning
+    # Treat unused imports as warnings
+    unused_import: warning
+    # Treat overridden fields as warnings
+    override_on_non_overriding_member: warning
+
+  exclude:
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
+
+linter:
+  rules:
+    # Avoid print statements in production code
+    avoid_print: true
+    # Prefer const constructors
+    prefer_const_constructors: true
+    # Prefer const constructors with immutable values
+    prefer_const_constructors_in_immutables: true
+    # Prefer const declarations
+    prefer_const_declarations: true
+    # Prefer final for local variables
+    prefer_final_locals: true
+    # Avoid relative imports
+    avoid_relative_lib_imports: true
+    # Specify library prefixes
+    always_specify_types: false
+    # Avoid empty else blocks
+    avoid_empty_else: true
+    # Avoid unnecessary braces
+    unnecessary_brace_in_string_interps: true
+    # Prefer single quotes
+    prefer_single_quotes: true
+    # Sort constructors first
+    sort_constructors_first: true
+    # Sort unnamed constructors first
+    sort_unnamed_constructors_first: true
+    # Prefer typing unspecified variables
+    prefer_typing_uninitialized_variables: true
+    # Avoid unused parameters
+    avoid_unused_constructor_parameters: true
+    # Prefer async/await
+    prefer_async_await: true
