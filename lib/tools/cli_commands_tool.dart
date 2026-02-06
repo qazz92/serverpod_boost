@@ -1,82 +1,206 @@
 /// CLI Commands Tool
 ///
-/// Lists and categorizes available ServerPod CLI commands from the bin/ directory.
+/// Lists and categorizes available ServerPod CLI commands.
+/// Returns both ServerPod built-in commands and project-specific bin/ scripts.
 library serverpod_boost.tools.cli_commands_tool;
 
 import 'dart:io';
+import 'package:path/path.dart' as p;
+
 import '../mcp/mcp_tool.dart';
 import '../serverpod/serverpod_locator.dart';
 
 class CliCommandsTool extends McpToolBase {
+  /// ServerPod built-in commands (always available)
+  static const List<Map<String, dynamic>> _serverpodBuiltInCommands = [
+    {
+      'name': 'run',
+      'description': 'Start the ServerPod server in development mode',
+      'category': 'server',
+      'usage': 'dart run serverpod run',
+      'isBuiltIn': true,
+    },
+    {
+      'name': 'migrate',
+      'description': 'Create and apply database migrations',
+      'category': 'database',
+      'usage': 'dart run serverpod migrate',
+      'isBuiltIn': true,
+    },
+    {
+      'name': 'generate',
+      'description': 'Generate protocol buffers and model classes from YAML definitions',
+      'category': 'build',
+      'usage': 'dart run serverpod generate',
+      'isBuiltIn': true,
+    },
+    {
+      'name': 'test',
+      'description': 'Run tests for the ServerPod project',
+      'category': 'test',
+      'usage': 'dart run serverpod test',
+      'isBuiltIn': true,
+    },
+    {
+      'name': 'docker',
+      'description': 'Manage Docker containers for development',
+      'category': 'deployment',
+      'usage': 'dart run serverpod docker',
+      'isBuiltIn': true,
+    },
+    {
+      'name': 'cloud',
+      'description': 'Deploy and manage Serverpod Cloud services',
+      'category': 'deployment',
+      'usage': 'dart run serverpod cloud',
+      'isBuiltIn': true,
+    },
+    {
+      'name': 'analyze',
+      'description': 'Analyze code quality and find potential issues',
+      'category': 'tools',
+      'usage': 'dart analyze',
+      'isBuiltIn': true,
+    },
+    {
+      'name': 'format',
+      'description': 'Format Dart code according to Dart style guidelines',
+      'category': 'tools',
+      'usage': 'dart format .',
+      'isBuiltIn': true,
+    },
+  ];
+
   @override
   String get name => 'cli_commands';
 
   @override
-  String get description => 'List available ServerPod CLI commands';
+  String get description => '''
+List available ServerPod CLI commands.
+
+Returns both:
+- ServerPod built-in commands (run, migrate, generate, test, docker, cloud, analyze, format)
+- Project-specific commands from the bin/ directory (if any)
+
+Each command includes its name, description, category, and usage example.
+  ''';
 
   @override
   Map<String, dynamic> get inputSchema => McpSchema.inputSchema(
     type: 'object',
     properties: {
-      'category': {
-        'type': 'string',
-        'description': 'Filter by category',
-      },
+      'category': McpSchema.string(
+        description: 'Filter by category (e.g., "server", "database", "build", "test", "deployment", "tools")',
+      ),
+      'source': McpSchema.enumProperty(
+        values: ['all', 'built-in', 'custom'],
+        description: 'Filter by command source (default: all)',
+        defaultValue: 'all',
+      ),
     },
   );
 
   @override
   Future<dynamic> executeImpl(Map<String, dynamic> params) async {
     final category = params['category'] as String?;
+    final source = params['source'] as String? ?? 'all';
+
     final project = ServerPodLocator.getProject();
 
     if (project == null || !project.isValid) {
-      return {'error': 'Not a valid ServerPod project'};
+      return {
+        'error': 'Not a valid ServerPod project',
+        'hint': 'Run this command from a ServerPod project directory',
+      };
     }
 
     try {
-      // Find bin directory
-      final binDirectory = Directory.fromUri(Uri.file(project.rootPath).resolve('bin/'));
-      if (!await binDirectory.exists()) {
-        return {'error': 'No bin/ directory found'};
+      // Start with built-in commands
+      var commands = <Map<String, dynamic>>[
+        ..._serverpodBuiltInCommands,
+      ];
+
+      // Add custom commands from bin/ if exists
+      final customCommands = await _loadCustomCommands(project);
+      commands.addAll(customCommands);
+
+      // Apply category filter
+      if (category != null) {
+        commands = commands
+            .where((cmd) => cmd['category'] == category)
+            .toList();
       }
 
-      // Collect .dart files in bin directory (excluding this file itself)
+      // Apply source filter
+      if (source == 'built-in') {
+        commands = commands.where((cmd) => cmd['isBuiltIn'] == true).toList();
+      } else if (source == 'custom') {
+        commands = commands.where((cmd) => cmd['isBuiltIn'] == false).toList();
+      }
+
+      // Group by category
+      final categories = <String, int>{};
+      for (final cmd in commands) {
+        final cat = cmd['category'] as String;
+        categories[cat] = (categories[cat] ?? 0) + 1;
+      }
+
+      final builtInCount = commands.where((cmd) => cmd['isBuiltIn'] == true).length;
+      final customCount = commands.where((cmd) => cmd['isBuiltIn'] == false).length;
+
+      return {
+        'commands': commands,
+        'categories': categories,
+        'count': commands.length,
+        'builtInCount': builtInCount,
+        'customCount': customCount,
+        'serverpodVersion': await _getServerpodVersion(project),
+      };
+    } catch (e) {
+      return {
+        'error': 'Failed to list CLI commands: ${e.toString()}',
+      };
+    }
+  }
+
+  /// Load custom commands from project's bin/ directory
+  Future<List<Map<String, dynamic>>> _loadCustomCommands(ServerPodProject project) async {
+    final commands = <Map<String, dynamic>>[];
+
+    try {
+      // Find bin directory
+      final binDirectory = Directory(p.join(project.rootPath, 'bin'));
+      if (!await binDirectory.exists()) {
+        return commands;
+      }
+
+      // Collect .dart files in bin directory
       final dartFiles = binDirectory.listSync()
           .where((entity) =>
             entity is File &&
             entity.uri.pathSegments.last.endsWith('.dart') &&
-            !entity.uri.pathSegments.last.contains('boost.dart') // Exclude main entry point
+            !entity.uri.pathSegments.last.contains('main.dart') // Exclude main entry point
           )
           .cast<File>();
-
-      final commands = <Map<String, dynamic>>[];
-      final categories = <String>{};
 
       for (final file in dartFiles) {
         final command = await _parseCommandFile(file, project);
         if (command != null) {
-          if (category == null || command['category'] == category) {
-            commands.add(command);
-            categories.add(command['category']);
-          }
+          commands.add(command);
         }
       }
-
-      return {
-        'commands': commands,
-        'categories': categories.toList(),
-        'count': commands.length,
-      };
     } catch (e) {
-      return {'error': 'Failed to parse CLI commands: ${e.toString()}'};
+      // Silently ignore errors when loading custom commands
     }
+
+    return commands;
   }
 
+  /// Parse a command file to extract metadata
   Future<Map<String, dynamic>?> _parseCommandFile(File file, ServerPodProject project) async {
     try {
       final content = await file.readAsString();
-      final fileName = file.uri.pathSegments.last;
+      final fileName = p.basename(file.path);
 
       // Extract command name from filename
       final commandName = fileName.replaceFirst('.dart', '');
@@ -91,23 +215,23 @@ class CliCommandsTool extends McpToolBase {
         'name': commandName,
         'description': description,
         'category': category,
-        'file': file.uri.pathSegments.join('/'),
+        'file': fileName,
         'relativePath': 'bin/$fileName',
-        'path': file.uri.toFilePath(),
+        'path': file.path,
+        'isBuiltIn': false,
       };
     } catch (e) {
-      print('Error parsing command file ${file.path}: $e');
       return null;
     }
   }
 
+  /// Extract description from doc comments
   String _extractDescription(String content) {
-    // Look for doc comments /// at the beginning of the file
     final lines = content.split('\n');
     String description = '';
     bool inDocComment = false;
     int docCommentLineCount = 0;
-    const maxDocLines = 5; // Only look at first 5 lines for description
+    const maxDocLines = 5;
 
     for (int i = 0; i < lines.length && docCommentLineCount < maxDocLines; i++) {
       final line = lines[i].trim();
@@ -121,43 +245,26 @@ class CliCommandsTool extends McpToolBase {
           description += commentText;
         }
       } else if (inDocComment && line.trim().isEmpty) {
-        // Empty line in doc comment
         docCommentLineCount++;
         if (description.isNotEmpty) description += ' ';
       } else if (!line.startsWith('import') && !line.startsWith('library')) {
-        // End of doc comments, start of actual code
         break;
       }
     }
 
-    // If no description found, use a default based on command name
     if (description.isEmpty) {
-      switch (_extractCommandNameFromContent(content)) {
-        case 'run':
-          return 'Start the ServerPod server';
-        case 'build':
-          return 'Build the ServerPod project';
-        case 'test':
-          return 'Run tests for the ServerPod project';
-        case 'migrate':
-          return 'Run database migrations';
-        case 'generate':
-          return 'Generate code from models';
-        case 'serve':
-          return 'Start the development server';
-        default:
-          return 'CLI command for ServerPod development';
-      }
+      return 'Custom CLI command';
     }
 
     return description;
   }
 
+  /// Determine category from filename patterns
   String _determineCategory(String fileName) {
     final lowerName = fileName.toLowerCase();
 
     if (lowerName.contains('migration') || lowerName.contains('migrate')) {
-      return 'migration';
+      return 'database';
     } else if (lowerName.contains('db') || lowerName.contains('database')) {
       return 'database';
     } else if (lowerName.contains('server') || lowerName.contains('run') || lowerName.contains('serve')) {
@@ -169,37 +276,26 @@ class CliCommandsTool extends McpToolBase {
     } else if (lowerName.contains('deploy') || lowerName.contains('prod')) {
       return 'deployment';
     } else if (lowerName.contains('auth') || lowerName.contains('user')) {
-      return 'auth';
+      return 'authentication';
     } else {
       return 'tools';
     }
   }
 
-  String _extractCommandNameFromContent(String content) {
-    // Try to find main function or similar command patterns
-    final lines = content.split('\n');
+  /// Get ServerPod version from pubspec.yaml
+  Future<String> _getServerpodVersion(ServerPodProject project) async {
+    final serverPath = project.serverPath;
+    if (serverPath == null) return 'unknown';
 
-    for (final line in lines) {
-      if (line.contains('void main(') || line.contains('Future<void> main(')) {
-        // Extract after 'main('
-        final mainMatch = RegExp(r'main\(\s*([^)]*)\s*\)').firstMatch(line);
-        if (mainMatch != null) {
-          final args = mainMatch.group(1) ?? '';
-          if (args.contains('run') || args.contains('serve')) {
-            return 'run';
-          }
-        }
-        return 'run';
+    try {
+      final pubspec = File(p.join(serverPath, 'pubspec.yaml'));
+      if (await pubspec.exists()) {
+        final content = await pubspec.readAsString();
+        final match = RegExp(r'serverpod:\s*\^?([\d.]+)').firstMatch(content);
+        return match?.group(1) ?? 'unknown';
       }
-
-      // Look for command definitions (simplified)
-      if (line.contains('run') && line.contains('Command')) {
-        return 'run';
-      } else if (line.contains('build') && line.contains('Command')) {
-        return 'build';
-      } else if (line.contains('test') && line.contains('Command')) {
-        return 'test';
-      }
+    } catch (e) {
+      // Ignore
     }
 
     return 'unknown';

@@ -29,6 +29,3 @@ export 'database_query_tool.dart';
 
 // Tier 4: CLI Tools
 export 'cli_commands_tool.dart';
-
-// Tier 5: Developer Tools
-export 'tinker_tool.dart';

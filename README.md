@@ -8,13 +8,12 @@
 
 ServerPod Boost is an MCP server that provides AI assistants (like Claude) with deep semantic understanding of ServerPod projects, enabling high-quality code generation through context-aware tool access.
 
-## Version 0.1.3 - MCP Path Option
+## Version 0.1.6 - Enhanced Built-in Resources
 
-ServerPod Boost now supports running from any directory with the `--path` option, making it easier to use when your `.mcp.json` is in your project root but your ServerPod server is in a subdirectory.
-
-## Version 0.1.2 - Published Package Fix
-
-This is the first public release of ServerPod Boost, providing the core infrastructure for AI-assisted ServerPod development. The skills system framework is in place, with pre-built skills coming in future releases.
+- ✅ **Built-in Skills**: 8 skill categories now included (authentication, core, endpoints, migrations, models, redis, testing, webhooks)
+- ✅ **ServerPod CLI Commands**: 8 built-in commands now available (run, migrate, generate, test, docker, cloud, analyze, format)
+- ✅ **Database SSL Fix**: SSL mode defaults to `disable` for local development
+- ✅ **Tools**: 19 MCP tools (removed tinker)
 
 ## What is ServerPod Boost?
 
@@ -26,7 +25,8 @@ Inspired by [Laravel Boost](https://github.com/joelbutcher/laravel_boost), Serve
 - **Database Context**: Access migration files and database schemas
 - **Configuration Access**: Read all YAML config files
 - **Code Search**: Full-text search across source code
-- **Skills Infrastructure**: Framework for extensible workflows (pre-built skills coming soon)
+- **Built-in Skills**: 8 pre-built skill categories for common ServerPod tasks
+- **Built-in Commands**: ServerPod CLI commands readily accessible
 
 ## Quick Start
 
@@ -85,11 +85,12 @@ Ask Claude anything about your ServerPod project:
 - "Create a new endpoint for user management"
 - "Show me the database schema for the users table"
 - "Generate a test for the greeting endpoint"
-- "Use the endpoint_creator skill to add a user profile endpoint"
+- "List available ServerPod CLI commands"
+- "Show me built-in skills for authentication"
 
 ## Features
 
-### 20 Built-in Tools
+### 19 Built-in Tools
 
 | Tool | Description |
 |------|-------------|
@@ -107,16 +108,41 @@ Ask Claude anything about your ServerPod project:
 | `search_code` | Search code content |
 | `call_endpoint` | Test endpoints |
 | `service_config` | Service configuration |
-| `list_skills` | List available skills |
+| `list_skills` | List built-in and custom skills |
 | `get_skill` | Get skill content |
 | `log_reader` | Read ServerPod logs |
-| `database_query` | Query database |
-| `cli_commands` | List CLI commands |
-| `tinker` | Execute Dart code |
+| `database_query` | Query database (SSL: disable by default) |
+| `cli_commands` | List ServerPod built-in and custom commands |
 
-### Skills Infrastructure
+### 8 Built-in Skills
 
-ServerPod Boost includes the infrastructure for an extensible skills system. The framework is in place for creating and managing reusable workflows that combine multiple tools. Pre-built skills will be available in future releases.
+ServerPod Boost includes 8 categories of pre-built skills:
+
+| Category | Description |
+|----------|-------------|
+| `authentication` | User authentication and authorization workflows |
+| `core` | Core ServerPod concepts and patterns |
+| `endpoints` | Endpoint creation and best practices |
+| `migrations` | Database migration workflows |
+| `models` | Protocol model definition patterns |
+| `redis` | Caching with Redis |
+| `testing` | Testing strategies and patterns |
+| `webhooks` | Webhook implementation |
+
+### ServerPod CLI Commands
+
+The `cli_commands` tool returns 8 built-in ServerPod commands:
+
+| Command | Description |
+|---------|-------------|
+| `run` | Start the ServerPod server |
+| `migrate` | Create and apply database migrations |
+| `generate` | Generate protocol buffers and models |
+| `test` | Run tests |
+| `docker` | Manage Docker containers |
+| `cloud` | Deploy to Serverpod Cloud |
+| `analyze` | Analyze code quality |
+| `format` | Format Dart code |
 
 ## CLI Commands
 
@@ -190,7 +216,7 @@ boost models
 
 - **[사용자 가이드 (User Guide)](doc/USER_GUIDE.md)** - 완전한 사용 설명서 (설치, 빠른 시작, MCP 도구, 스킬 시스템, CLI 명령어)
 - **[CLI 명령어 레퍼런스 (CLI Reference)](doc/CLI_REFERENCE.md)** - 모든 CLI 명령어 상세 설명
-- **[MCP 도구 레퍼런스 (MCP Tools Reference)](doc/MCP_TOOLS_REFERENCE.md)** - 20개 MCP 도구 상세 문서
+- **[MCP 도구 레퍼런스 (MCP Tools Reference)](doc/MCP_TOOLS_REFERENCE.md)** - 19개 MCP 도구 상세 문서
 - **[스킬 개발 가이드 (Skills Development Guide)](doc/SKILLS_DEVELOPMENT_GUIDE.md)** - 커스텀 스킬 만들기
 - [AGENTS.md](AGENTS.md) - AI 에이전트를 위한 프로젝트 문서
 
@@ -198,7 +224,7 @@ boost models
 
 Boost includes 400+ tests covering:
 
-- Tool functionality (20 tools × multiple scenarios)
+- Tool functionality (19 tools × multiple scenarios)
 - Skills system infrastructure
 - File provisioning
 - MCP protocol compliance
@@ -238,4 +264,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for the ServerPod community**
 
-**Version**: 0.1.3 | **Tests**: 400+ | **Tools**: 20
+**Version**: 0.1.6 | **Tests**: 400+ | **Tools**: 19 | **Skills**: 8 built-in categories

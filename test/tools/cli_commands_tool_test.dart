@@ -69,7 +69,7 @@ void main(List<String> args) {
         final request = McpRequest(
           id: 'test',
           method: 'cli_commands',
-          params: {},
+          params: {'source': 'custom'},  // Only test custom commands
         );
 
         final response = await testTool.execute(request);
@@ -81,7 +81,7 @@ void main(List<String> args) {
         expect(response.result['categories'], isList);
         expect(response.result['count'], isA<int>());
 
-        // Verify commands found
+        // Verify commands found (only custom, no built-in)
         final commands = response.result['commands'] as List;
         expect(commands.length, equals(2));
 

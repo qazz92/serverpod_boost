@@ -64,7 +64,6 @@ void main() {
         expect(toolNames, contains('get_skill'));
         expect(toolNames, contains('database_query'));
         expect(toolNames, contains('cli_commands'));
-        expect(toolNames, contains('tinker'));
       });
 
       test('create with custom registry', () {

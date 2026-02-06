@@ -5,6 +5,41 @@ All notable changes to ServerPod Boost will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.html).
 
+## [0.1.6] - 2026-02-06
+
+### Added
+- **list_skills Built-in Skills**: Now includes 8 built-in skill categories from serverpod_boost package
+  - authentication, core, endpoints, migrations, models, redis, testing, webhooks
+  - Skills are loaded from lib/resources/skills/ using package_config
+  - Merges built-in skills with user's custom skills from .ai/skills/
+  - New `source` parameter to filter by 'all', 'built-in', or 'custom'
+- **get_skill Built-in Skills**: Now searches lib/resources/skills/ for built-in skills
+  - Added _findBoostSkillsPath() method using package_config
+  - Returns available skills in error message for better UX
+  - New `source` parameter to prefer built-in or custom skills
+- **cli_commands Built-in Commands**: Now returns 8 ServerPod built-in commands
+  - run, migrate, generate, test, docker, cloud, analyze, format
+  - Merges built-in commands with project's custom bin/ scripts
+  - New `source` parameter to filter by command origin
+  - Each command includes usage example
+- **database_query SSL Mode**: Added `sslMode` parameter for PostgreSQL SSL configuration
+  - Values: disable, allow, prefer, require, verify-ca, verify-full
+  - Default: `disable` (for local development)
+  - Connection pool key now includes sslMode for proper connection isolation
+
+### Changed
+- **list_skills**: Returns merged list with builtInCount and userCount
+- **get_skill**: Returns source field indicating 'built-in' or 'custom'
+- **cli_commands**: Returns builtInCount and customCount, ServerPod version
+
+### Removed
+- **tinker Tool**: Removed tinker tool (19 tools total)
+  - Use `dart run` directly for code evaluation
+  - Removed lib/tools/tinker_tool.dart
+  - Removed test/tools/tinker_tool_test.dart
+  - Updated lib/tools/tools.dart
+  - Updated test/mcp/boost_mcp_server_test.dart
+
 ## [0.1.5] - 2026-02-06
 
 ### Added

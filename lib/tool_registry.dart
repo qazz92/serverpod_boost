@@ -13,7 +13,6 @@ import 'tools/tools.dart';
 import 'tools/cli_commands_tool.dart';
 import 'tools/database_query_tool.dart';
 import 'tools/log_reader_tool.dart';
-import 'tools/tinker_tool.dart';
 
 /// Tool Registry - Manual registration approach
 ///
@@ -54,9 +53,6 @@ class BoostToolRegistry {
 
     // CLI Tools (Tier 5)
     'cli_commands': CliCommandsTool(),
-
-    // Developer Tools (Tier 6)
-    'tinker': TinkerTool(),
   };
 
   /// Get tool by name

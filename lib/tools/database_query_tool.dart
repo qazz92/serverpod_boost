@@ -92,6 +92,11 @@ Use cases:
         description: 'Environment config to use (default: development)',
         defaultValue: 'development',
       ),
+      'sslMode': McpSchema.enumProperty(
+        values: ['disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full'],
+        description: 'PostgreSQL SSL mode (default: disable for local development)',
+        defaultValue: 'disable',
+      ),
     },
   );
 
@@ -126,6 +131,7 @@ Use cases:
     final query = (params['query'] as String).trim();
     final maxRowsParam = (params['maxRows'] as int?) ?? defaultMaxRows;
     final environment = (params['environment'] as String?) ?? 'development';
+    final sslMode = (params['sslMode'] as String?) ?? 'disable';
 
     final project = ServerPodLocator.getProject();
     if (project == null || !project.isValid) {
@@ -147,7 +153,7 @@ Use cases:
       }
 
       // Get or create connection pool
-      final pool = await _getConnectionPool(dbConfig);
+      final pool = await _getConnectionPool(dbConfig, sslMode);
 
       // Execute query with timeout and row limit
       final stopwatch = Stopwatch()..start();
@@ -164,6 +170,7 @@ Use cases:
         'columns': result['columns'],
         'executionTimeMs': stopwatch.elapsedMilliseconds,
         'environment': environment,
+        'sslMode': sslMode,
       };
     } on PgException catch (e) {
       return {
@@ -238,8 +245,11 @@ Use cases:
   }
 
   /// Get or create a connection pool for the given database config
-  Future<Pool> _getConnectionPool(Map<String, dynamic> dbConfig) async {
-    final poolKey = _getPoolKey(dbConfig);
+  Future<Pool> _getConnectionPool(
+    Map<String, dynamic> dbConfig,
+    String sslMode,
+  ) async {
+    final poolKey = _getPoolKey(dbConfig, sslMode);
 
     if (_connectionPools.containsKey(poolKey)) {
       return _connectionPools[poolKey]!;
@@ -266,6 +276,7 @@ Use cases:
       database: dbName,
       user: user,
       password: password,
+      sslMode: sslMode,
     );
 
     // Create connection pool
@@ -282,6 +293,7 @@ Use cases:
     required String database,
     String? user,
     String? password,
+    String sslMode = 'disable',
   }) {
     final buffer = StringBuffer('postgresql://');
 
@@ -300,15 +312,22 @@ Use cases:
     buffer.write('/');
     buffer.write(database);
 
+    // Add SSL mode query parameter
+    // 'prefer' is PostgreSQL default, so skip it
+    if (sslMode != 'prefer') {
+      buffer.write('?sslmode=');
+      buffer.write(sslMode);
+    }
+
     return buffer.toString();
   }
 
   /// Generate unique key for connection pool
-  String _getPoolKey(Map<String, dynamic> dbConfig) {
+  String _getPoolKey(Map<String, dynamic> dbConfig, String sslMode) {
     final host = dbConfig['host'] as String? ?? 'localhost';
     final port = dbConfig['port'] as int? ?? 5432;
     final dbName = dbConfig['name'] as String? ?? 'postgres';
-    return '$host:$port:$dbName';
+    return '$host:$port:$dbName:$sslMode';
   }
 
   /// Load database configuration from ServerPod config files

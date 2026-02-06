@@ -1,11 +1,13 @@
 /// Get Skill Tool
 ///
 /// Retrieves the content of a specific AI skill for ServerPod development.
+/// Searches both built-in skills and user's custom skills.
 library serverpod_boost.tools.get_skill_tool;
 
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
+import 'package:package_config/package_config.dart';
 
 import '../mcp/mcp_tool.dart';
 import '../serverpod/serverpod_locator.dart';
@@ -25,9 +27,9 @@ ServerPod projects. Each skill contains:
 - Metadata (version, description, tags)
 - Optional dependencies on other skills
 
-Use this tool to retrieve skill content when you need specialized
-knowledge about ServerPod features like authentication, endpoints,
-models, migrations, etc.
+This tool searches both:
+- Built-in skills from serverpod_boost package
+- Custom skills from your project's .ai/skills/ directory
 
 Returns skill content as markdown with template variables populated
 from the current project context.
@@ -42,9 +44,14 @@ from the current project context.
         required: true,
       ),
       'category': McpSchema.string(
-        description: 'Optional category (defaults to "serverpod"). '
-            'Available categories: "serverpod", "remote"',
+        description: 'Optional category (defaults to "authentication"). '
+            'Available categories: "authentication", "core", "endpoints", "migrations", "models", "redis", "testing", "webhooks"',
         required: false,
+      ),
+      'source': McpSchema.enumProperty(
+        values: ['any', 'built-in', 'custom'],
+        description: 'Preferred skill source (default: any - checks built-in first)',
+        defaultValue: 'any',
       ),
     },
     required: ['skill_name'],
@@ -65,7 +72,8 @@ from the current project context.
   @override
   Future<dynamic> executeImpl(Map<String, dynamic> params) async {
     final skillName = params['skill_name'] as String;
-    final category = params['category'] as String? ?? 'serverpod';
+    final category = params['category'] as String? ?? 'authentication';
+    final source = params['source'] as String? ?? 'any';
 
     // Get project to locate skills directory
     final project = ServerPodLocator.getProject();
@@ -75,15 +83,20 @@ from the current project context.
       skillName,
       category,
       project?.rootPath,
+      source,
     );
 
     if (skillFile == null) {
+      // Get available skills for helpful error message
+      final availableSkills = await _getAvailableSkills();
       return {
         'error': 'Skill not found',
         'message': 'Could not find skill "$skillName" in category "$category". '
-            'Available skills can be listed using the list_skills tool.',
+            'Use list_skills to see all available skills.',
         'skill_name': skillName,
         'category': category,
+        'source': source,
+        'availableSkills': availableSkills,
       };
     }
 
@@ -96,6 +109,9 @@ from the current project context.
     // Extract template variables from the project context
     final templateVars = await _extractTemplateVars(project);
 
+    // Determine if this is a built-in or custom skill
+    final isBuiltIn = skillFile.path.contains('/lib/resources/skills/');
+
     return {
       'name': skillName,
       'category': category,
@@ -103,6 +119,8 @@ from the current project context.
       'metadata': metadata,
       'template_vars': templateVars,
       'path': skillFile.path,
+      'isBuiltIn': isBuiltIn,
+      'source': isBuiltIn ? 'built-in' : 'custom',
     };
   }
 
@@ -111,25 +129,38 @@ from the current project context.
     String skillName,
     String category,
     String? projectRoot,
+    String source,
   ) async {
     // Build list of possible paths to search
     final possiblePaths = <String>[];
 
-    if (projectRoot != null) {
-      // Project-local skills directory
-      possiblePaths.addAll([
-        p.join(projectRoot, '.ai', 'skills', category, skillName, 'SKILL.md.mustache'),
-        p.join(projectRoot, 'skills', category, skillName, 'SKILL.md.mustache'),
-      ]);
+    // Priority 1: Built-in skills from serverpod_boost package
+    if (source == 'any' || source == 'built-in') {
+      final builtInPath = await _findBoostSkillsPath();
+      if (builtInPath != null) {
+        possiblePaths.add(
+          p.join(builtInPath, category, skillName, 'SKILL.md.mustache')
+        );
+      }
     }
 
-    // Global skills directories (check relative to this package)
-    final packageRoot = _getPackageRoot();
-    if (packageRoot != null) {
-      possiblePaths.addAll([
-        p.join(packageRoot, '.ai', 'skills', category, skillName, 'SKILL.md.mustache'),
-        p.join(packageRoot, 'test', 'skills', category, skillName, 'SKILL.md.mustache'),
-      ]);
+    // Priority 2: Project-local skills directory
+    if (source == 'any' || source == 'custom') {
+      if (projectRoot != null) {
+        possiblePaths.addAll([
+          p.join(projectRoot, '.ai', 'skills', category, skillName, 'SKILL.md.mustache'),
+          p.join(projectRoot, 'skills', category, skillName, 'SKILL.md.mustache'),
+        ]);
+      }
+
+      // Try global skills directories
+      final packageRoot = _getPackageRoot();
+      if (packageRoot != null) {
+        possiblePaths.addAll([
+          p.join(packageRoot, '.ai', 'skills', category, skillName, 'SKILL.md.mustache'),
+          p.join(packageRoot, 'test', 'skills', category, skillName, 'SKILL.md.mustache'),
+        ]);
+      }
     }
 
     // Check each path
@@ -141,6 +172,77 @@ from the current project context.
     }
 
     return null;
+  }
+
+  /// Find the serverpod_boost package skills directory
+  Future<String?> _findBoostSkillsPath() async {
+    // Strategy 1: Use package_config to find lib/resources/skills
+    try {
+      final packageConfig = await findPackageConfig(Directory.current);
+      if (packageConfig != null) {
+        final boostPackage = packageConfig['serverpod_boost'];
+        if (boostPackage != null) {
+          final packageRoot = boostPackage.root.path;
+          final resourcesPath = p.join(packageRoot, 'lib', 'resources', 'skills');
+          if (await Directory(resourcesPath).exists()) {
+            return resourcesPath;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore and try next strategy
+    }
+
+    // Strategy 2: Try local development path
+    try {
+      final currentScript = File.fromUri(Platform.script);
+      final boostPackageRoot = currentScript.parent.parent.path;
+      final localPath = p.join(boostPackageRoot, '.ai', 'skills');
+      if (await Directory(localPath).exists()) {
+        return localPath;
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    // Strategy 3: Try resolving from current package
+    try {
+      final currentScript = File.fromUri(Platform.script);
+      final binDir = currentScript.parent;
+      final packageRoot = binDir.parent;
+      final resourcesPath = p.join(packageRoot.path, 'lib', 'resources', 'skills');
+      if (await Directory(resourcesPath).exists()) {
+        return resourcesPath;
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    return null;
+  }
+
+  /// Get list of available skills for error messages
+  Future<Map<String, List<String>>> _getAvailableSkills() async {
+    final skills = <String, List<String>>{};
+
+    final builtInPath = await _findBoostSkillsPath();
+    if (builtInPath != null) {
+      final skillsDir = Directory(builtInPath);
+      if (await skillsDir.exists()) {
+        for (final categoryDir in skillsDir.listSync()) {
+          if (categoryDir is! Directory) continue;
+          final categoryName = p.basename(categoryDir.path);
+          final skillNames = <String>[];
+          for (final skillDir in categoryDir.listSync()) {
+            if (skillDir is! Directory) continue;
+            skillNames.add(p.basename(skillDir.path));
+          }
+          skills[categoryName] = skillNames;
+        }
+      }
+    }
+
+    return skills;
   }
 
   /// Load metadata from meta.yaml if it exists
