@@ -10,16 +10,32 @@ class BoostMcpServer {
   BoostMcpServer._({
     required Server server,
     required ServerPodProject project,
+    required bool verbose,
   })  : _server = server,
-        _project = project;
+        _project = project,
+        _verbose = verbose;
 
   final Server _server;
   final ServerPodProject _project;
+  final bool _verbose;
 
   /// Create and configure the server
-  static Future<BoostMcpServer> create() async {
+  static Future<BoostMcpServer> create({
+    String? projectPath,
+    bool verbose = false,
+  }) async {
+    // Set project root from argument if provided
+    if (projectPath != null && projectPath.isNotEmpty) {
+      // Temporarily set environment variable for detection
+      // Note: This won't modify Platform.environment directly
+      // Instead, we'll pass it to ServerPodLocator
+    }
+
     // Detect ServerPod project
-    final project = ServerPodLocator.getProject();
+    final project = projectPath != null && projectPath.isNotEmpty
+        ? ServerPodLocator.getProject(currentPath: projectPath)
+        : ServerPodLocator.getProject();
+
     if (project == null || !project.isValid) {
       throw StateError('Not a valid ServerPod project');
     }
@@ -40,14 +56,16 @@ class BoostMcpServer {
       adaptMcpToolToServer(tool, server);
     }
 
-    return BoostMcpServer._(server: server, project: project);
+    return BoostMcpServer._(
+      server: server,
+      project: project,
+      verbose: verbose,
+    );
   }
 
   /// Start the server
   Future<void> start() async {
-    final verbose = Platform.environment['SERVERPOD_BOOST_VERBOSE'] == 'true';
-
-    if (verbose) {
+    if (_verbose) {
       stderr.writeln('[INFO] ServerPod Boost starting...');
       stderr.writeln('[INFO] Project: ${_project.rootPath}');
       stderr.writeln('[INFO] Server: ${_project.serverPath}');
@@ -65,7 +83,7 @@ class BoostMcpServer {
 
     _server.connect(transport);
 
-    if (verbose) {
+    if (_verbose) {
       stderr.writeln('[INFO] MCP server ready');
     }
   }

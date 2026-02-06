@@ -154,14 +154,16 @@ class CLIApp {
 
   /// Run the MCP server (default mode)
   Future<void> _runMCPServer(List<String> args) async {
-    // Set verbose mode for server
-    if (args.contains('--verbose') || args.contains('-v')) {
-      Platform.environment['SERVERPOD_BOOST_VERBOSE'] = 'true';
-    }
+    // Extract options
+    final verbose = args.contains('--verbose') || args.contains('-v');
+    final projectPath = _extractOption(args, '--path');
 
     try {
       // Create and start server
-      final server = await BoostMcpServer.create();
+      final server = await BoostMcpServer.create(
+        projectPath: projectPath,
+        verbose: verbose,
+      );
       await server.start();
 
       // Handle shutdown signals
@@ -176,22 +178,22 @@ class CLIApp {
       // Keep running until shutdown signal
       // The server.start() handles all logging and stays alive
     } on StateError catch (e) {
-      _logError(e.message, true);
+      _logError(e.message, verbose);
       _logError(
-          'ServerPod Boost must be run from within a ServerPod project.', true);
-      _logError('', true);
-      _logError('Project structure should be:', true);
-      _logError('  monorepo_root/', true);
-      _logError('  ├── project_server/   (required)', true);
-      _logError('  ├── project_client/   (optional)', true);
-      _logError('  └── project_flutter/  (optional)', true);
-      _logError('', true);
+          'ServerPod Boost must be run from within a ServerPod project.', verbose);
+      _logError('', verbose);
+      _logError('Project structure should be:', verbose);
+      _logError('  monorepo_root/', verbose);
+      _logError('  ├── project_server/   (required)', verbose);
+      _logError('  ├── project_client/   (optional)', verbose);
+      _logError('  └── project_flutter/  (optional)', verbose);
+      _logError('', verbose);
       _logError(
           'Set SERVERPOD_BOOST_PROJECT_ROOT environment variable to override detection.',
-          true);
+          verbose);
       exit(1);
     } catch (e) {
-      _logError('Failed to start MCP server: $e', true);
+      _logError('Failed to start MCP server: $e', verbose);
       exit(1);
     }
   }
@@ -234,6 +236,7 @@ class CLIApp {
     stderr.writeln('  -h, --help                  Show this help message');
     stderr.writeln('');
     stderr.writeln('MCP Server Options:');
+    stderr.writeln('  --path=<project_path>       Path to ServerPod project root');
     stderr.writeln('  --verbose                   Enable verbose logging');
     stderr.writeln('');
     stderr.writeln('Examples:');

@@ -5,6 +5,19 @@ All notable changes to ServerPod Boost will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.html).
 
+## [0.1.3] - 2026-02-06
+
+### Added
+- **MCP Server `--path` Option**: Allow specifying ServerPod project path via command-line argument
+  - Use `--path=/path/to/project` to specify project root
+  - Enables MCP server to run from any directory
+  - Useful when `.mcp.json` is in project root but server is in subdirectory
+
+### Fixed
+- **MCP Server Verbose Logging**: Fixed verbose flag not being passed through properly
+  - `--verbose` flag now correctly enables detailed logging
+  - Shows project detection, server path, and tool count
+
 ## [0.1.2] - 2026-02-05
 
 ### Fixed

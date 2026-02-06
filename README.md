@@ -8,6 +8,10 @@
 
 ServerPod Boost is an MCP server that provides AI assistants (like Claude) with deep semantic understanding of ServerPod projects, enabling high-quality code generation through context-aware tool access.
 
+## Version 0.1.3 - MCP Path Option
+
+ServerPod Boost now supports running from any directory with the `--path` option, making it easier to use when your `.mcp.json` is in your project root but your ServerPod server is in a subdirectory.
+
 ## Version 0.1.2 - Published Package Fix
 
 This is the first public release of ServerPod Boost, providing the core infrastructure for AI-assisted ServerPod development. The skills system framework is in place, with pre-built skills coming in future releases.
@@ -53,15 +57,39 @@ That's it! The installer will:
 
 ### 2. Configure Claude Desktop
 
-If you didn't use the interactive installer, add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+If you didn't use the interactive installer, add this to your project's `.mcp.json`:
 
+**Option A: Using local installation (from server directory)**
 ```json
 {
   "mcpServers": {
     "serverpod-boost": {
       "command": "dart",
-      "args": [".ai/boost/bin/boost.dart"],
-      "cwd": "/path/to/your/project"
+      "args": [".ai/boost/bin/boost.dart"]
+    }
+  }
+}
+```
+
+**Option B: Using global activation (from any directory)**
+```json
+{
+  "mcpServers": {
+    "serverpod-boost": {
+      "command": "/Users/yourname/.pub-cache/bin/boost",
+      "args": ["--path=/path/to/your/project"]
+    }
+  }
+}
+```
+
+**Option C: Using pub global run (from any directory)**
+```json
+{
+  "mcpServers": {
+    "serverpod-boost": {
+      "command": "dart",
+      "args": ["pub", "global", "run", "serverpod_boost:boost", "--path=/path/to/your/project"]
     }
   }
 }
@@ -229,4 +257,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for the ServerPod community**
 
-**Version**: 0.1.2 | **Tests**: 400+ | **Tools**: 20
+**Version**: 0.1.3 | **Tests**: 400+ | **Tools**: 20
