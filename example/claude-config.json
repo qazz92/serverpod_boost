@@ -5,13 +5,9 @@
       "command": "dart",
       "args": [
         "run",
-        "/Users/musinsa/always_summer/serverpod_boost/bin/boost.dart"
-      ],
-      "env": {
-        "SERVERPOD_BOOST_PROJECT_ROOT": "/Users/musinsa/always_summer/pilly",
-        "SERVERPOD_BOOST_VERBOSE": "true",
-        "SERVERPOD_BOOST_LOG_LEVEL": "debug"
-      }
+        "/Users/musinsa/always_summer/serverpod_boost/bin/boost.dart",
+        "--path=/path/to/your/project"
+      ]
     }
   }
 }

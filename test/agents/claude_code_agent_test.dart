@@ -28,7 +28,7 @@ void main() {
     });
 
     test('has correct config path', () {
-      expect(agent.configPath, equals('.claude/mcp.json'));
+      expect(agent.configPath, equals('.mcp.json'));
     });
 
     test('has correct user config path when HOME is set', () {
@@ -50,16 +50,11 @@ void main() {
       final serverpodBoost = mcpServers['serverpod-boost'] as Map;
       expect(serverpodBoost, containsPair('command', 'dart'));
       expect(serverpodBoost, containsPair('args', isNotNull));
-      expect(serverpodBoost, containsPair('cwd', testProject.rootPath));
-      expect(serverpodBoost, containsPair('env', isNotNull));
 
       final args = serverpodBoost['args'] as List;
       expect(args, contains('run'));
       expect(args, contains('serverpod_boost:boost'));
-
-      final env = serverpodBoost['env'] as Map;
-      expect(env, containsPair('SERVERPOD_BOOST_PROJECT_ROOT', testProject.rootPath));
-      expect(env, containsPair('SERVERPOD_BOOST_VERBOSE', 'false'));
+      expect(args, contains('--path=${testProject.rootPath}'));
     });
 
     test('supports correct file types', () {
@@ -79,11 +74,8 @@ void main() {
       expect(config, containsPair('paths', isNotNull));
       expect(config, containsPair('files', isNotNull));
 
-      final paths = config['paths'] as List;
-      expect(paths, contains('.claude'));
-
       final files = config['files'] as List;
-      expect(files, contains('.claude/mcp.json'));
+      expect(files, contains('.mcp.json'));
       expect(files, contains('CLAUDE.md'));
     });
 
@@ -119,7 +111,7 @@ void main() {
         final config = agent.generateMcpConfig(project);
         await agent.writeMcpConfig(project, config);
 
-        final configFile = File('${tempDir.path}/.claude/mcp.json');
+        final configFile = File('${tempDir.path}/.mcp.json');
         expect(configFile.existsSync(), isTrue);
 
         final content = await configFile.readAsString();
@@ -139,9 +131,7 @@ void main() {
         );
 
         // Create existing config
-        final claudeDir = Directory('${tempDir.path}/.claude');
-        await claudeDir.create(recursive: true);
-        final configFile = File('${tempDir.path}/.claude/mcp.json');
+        final configFile = File('${tempDir.path}/.mcp.json');
         await configFile.writeAsString('''
 {
   "mcpServers": {

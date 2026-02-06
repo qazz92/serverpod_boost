@@ -41,12 +41,8 @@ class ClaudeCodeAgent extends Agent {
           'args': [
             'run',
             'serverpod_boost:boost',
+            '--path=${project.rootPath}',
           ],
-          'cwd': project.serverPath,
-          'env': {
-            'SERVERPOD_BOOST_PROJECT_ROOT': project.rootPath,
-            'SERVERPOD_BOOST_VERBOSE': 'false',
-          },
         },
       },
     };

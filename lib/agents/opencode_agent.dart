@@ -36,11 +36,8 @@ class OpenCodeAgent extends Agent {
           'args': [
             'run',
             'serverpod_boost:boost',
+            '--path=${project.rootPath}',
           ],
-          'cwd': project.rootPath,
-          'env': {
-            'SERVERPOD_BOOST_PROJECT_ROOT': project.rootPath,
-          },
         },
       },
     };

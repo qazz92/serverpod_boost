@@ -477,6 +477,12 @@ dart run serverpod_boost:boost
 # 상세 로깅 활성화
 dart run serverpod_boost:boost --verbose
 
+--path=<project_path>    Path to ServerPod project root
+                          (useful when .mcp.json is in project root)
+
+# 프로젝트 루트를 지정하여 실행 (프로젝트 루트에서 실행하는 경우 유용)
+dart run serverpod_boost:boost --path=/path/to/project
+
 # 환경 변수로 프로젝트 루트 지정
 SERVERPOD_BOOST_PROJECT_ROOT=/path/to/project dart run serverpod_boost:boost
 ```

@@ -5,6 +5,18 @@ All notable changes to ServerPod Boost will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.html).
 
+## [0.1.4] - 2026-02-06
+
+### Fixed
+- **Documentation**: Updated all documentation to reflect new `--path` option
+  - Updated USER_GUIDE.md with new MCP configuration format
+  - Updated CLI_REFERENCE.md with `--path` option documentation
+  - Updated example config files to use `--path` instead of `cwd` + `env`
+- **OpenCode Agent**: Updated to use `--path` option for consistency
+- **Tests**: Updated all test files for new MCP configuration format
+  - Removed assertions for old `cwd` and `env` parameters
+  - Added assertions for new `--path` argument
+
 ## [0.1.3] - 2026-02-06
 
 ### Added

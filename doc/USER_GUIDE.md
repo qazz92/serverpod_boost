@@ -104,11 +104,7 @@ Claude Desktop에서 ServerPod Boost를 사용하려면 MCP 설정을 추가해�
   "mcpServers": {
     "serverpod-boost": {
       "command": "dart",
-      "args": [".ai/boost/bin/boost.dart"],
-      "cwd": "/path/to/your/project",
-      "env": {
-        "SERVERPOD_BOOST_VERBOSE": "true"
-      }
+      "args": ["run", "serverpod_boost:boost", "--path=/path/to/your/project"]
     }
   }
 }
@@ -122,11 +118,7 @@ Claude Desktop에서 ServerPod Boost를 사용하려면 MCP 설정을 추가해�
   "mcpServers": {
     "serverpod-boost": {
       "command": "dart",
-      "args": [".ai\\boost\\bin\\boost.dart"],
-      "cwd": "C:\\path\\to\\your\\project",
-      "env": {
-        "SERVERPOD_BOOST_VERBOSE": "true"
-      }
+      "args": ["run", "serverpod_boost:boost", "--path=C:\\path\\to\\your\\project"]
     }
   }
 }
@@ -140,11 +132,7 @@ Claude Desktop에서 ServerPod Boost를 사용하려면 MCP 설정을 추가해�
   "mcpServers": {
     "serverpod-boost": {
       "command": "dart",
-      "args": [".ai/boost/bin/boost.dart"],
-      "cwd": "/path/to/your/project",
-      "env": {
-        "SERVERPOD_BOOST_VERBOSE": "true"
-      }
+      "args": ["run", "serverpod_boost:boost", "--path=/path/to/your/project"]
     }
   }
 }
@@ -1119,8 +1107,6 @@ boost skill:remove my-custom-skill --force
 
 | 변수 | 설명 | 기본값 |
 |------|------|--------|
-| `SERVERPOD_BOOST_PROJECT_ROOT` | 프로젝트 루트 경로 오버라이드 | 자동 감지 |
-| `SERVERPOD_BOOST_VERBOSE` | 상세 로깅 활성화 | false |
 | `SERVERPOD_BOOST_LOG_LEVEL` | 로그 레벨 | info |
 | `SERVERPOD_BOOST_NO_COLOR` | 색상 출력 비활성화 | false |
 | `SERVERPOD_BOOST_SKILLS_PATH` | 스킬 디렉토리 경로 | .ai/skills |
@@ -1379,8 +1365,7 @@ project_root/
 
 2. 수동으로 프로젝트 루트 지정:
 ```bash
-export SERVERPOD_BOOST_PROJECT_ROOT=/path/to/project
-dart run bin/boost.dart
+dart run bin/boost.dart --path=/path/to/project
 ```
 
 3. server.dart 파일 확인:
@@ -1439,8 +1424,7 @@ project_server/lib/src/
   "mcpServers": {
     "serverpod-boost": {
       "command": "dart",
-      "args": [".ai/boost/bin/boost.dart"],
-      "cwd": "/absolute/path/to/project"
+      "args": ["run", "serverpod_boost:boost", "--path=/absolute/path/to/project"]
     }
   }
 }
@@ -1448,15 +1432,13 @@ project_server/lib/src/
 
 2. 경로가 절대 경로인지 확인:
 ```json
-"cwd": "/Users/username/projects/my_project"  ✓
-"cwd": "~/projects/my_project"               ✗
+"args": ["run", "serverpod_boost:boost", "--path=/Users/username/projects/my_project"]  ✓
+"args": ["run", "serverpod_boost:boost", "--path=~/projects/my_project"]               ✗
 ```
 
 3. 상세 로깅으로 디버깅:
-```json
-"env": {
-  "SERVERPOD_BOOST_VERBOSE": "true"
-}
+```bash
+export SERVERPOD_BOOST_LOG_LEVEL=debug
 ```
 
 4. Claude Desktop 재시작:
@@ -1583,9 +1565,6 @@ dart pub upgrade serverpod
 
 ```bash
 # 환경 변수 설정
-export SERVERPOD_BOOST_VERBOSE=true
-
-# 또는
 export SERVERPOD_BOOST_LOG_LEVEL=debug
 
 # MCP 서버 실행

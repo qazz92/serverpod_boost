@@ -41,22 +41,9 @@ void main() {
         final server = config['servers']['serverpod-boost'];
 
         expect(server['command'], equals('dart'));
-        expect(server['args'], equals(['run', 'serverpod_boost:boost']));
-      });
-
-      test('includes environment variables', () {
-        final config = agent.generateMcpConfig(mockProject);
-        final server = config['servers']['serverpod-boost'];
-
-        expect(server['env']['SERVERPOD_BOOST_PROJECT_ROOT'],
-            equals(mockProject.rootPath));
-      });
-
-      test('includes current working directory', () {
-        final config = agent.generateMcpConfig(mockProject);
-        final server = config['servers']['serverpod-boost'];
-
-        expect(server['cwd'], equals(mockProject.rootPath));
+        expect(server['args'], contains('run'));
+        expect(server['args'], contains('serverpod_boost:boost'));
+        expect(server['args'], contains('--path=${mockProject.rootPath}'));
       });
     });
 
@@ -90,7 +77,7 @@ void main() {
           'servers': {
             'serverpod-boost': {
               'command': 'dart',
-              'args': ['run', 'serverpod_boost:boost'],
+              'args': ['run', 'serverpod_boost:boost', '--path=${mockProject.rootPath}'],
             }
           }
         };
