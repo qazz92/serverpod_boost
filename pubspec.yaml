@@ -1,5 +1,5 @@
 name: serverpod_boost
-version: 0.1.1
+version: 0.1.2
 description: >-
   AI acceleration for ServerPod development via MCP (Model Context Protocol).
   Provides AI assistants with deep context awareness of ServerPod projects,
@@ -22,6 +22,7 @@ dependencies:
   http: ^1.6.0
   postgres: ^3.0.0
   mcp_server: ^1.0.3
+  package_config: ^2.1.0
 
 dev_dependencies:
   lints: ^3.0.0
@@ -39,4 +40,4 @@ executables:
   install:
 
 assets:
-  - .ai/skills/
+  - lib/resources/skills/

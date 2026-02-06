@@ -1,0 +1,9 @@
+name: webhooks
+description: Webhook handling with ServerPod - receiving, processing, and delivering webhooks
+version: 1.0.0
+tags:
+  - serverpod
+  - webhooks
+  - integrations
+  - http
+  - events

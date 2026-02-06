@@ -1,0 +1,926 @@
+# ServerPod Authentication
+
+User authentication and authorization for {{project_name}} using ServerPod {{serverpod_version}}.
+
+## Overview
+
+ServerPod provides built-in authentication with `serverpod_auth_server`. This skill covers user registration, login, session management, and role-based access control.
+
+{{#uses_serverpod_auth}}
+## Setup
+
+Your project uses serverpod_auth:
+
+**pubspec.yaml:**
+```yaml
+dependencies:
+  serverpod_auth_server: ^{{serverpod_version}}
+  serverpod_auth_shared: ^{{serverpod_version}}
+```
+
+**config/generators.yaml:**
+```yaml
+authentication:
+  enabled: true
+```
+{{/uses_serverpod_auth}}
+
+## Database Setup
+
+### Run Auth Migrations
+
+```bash
+# Apply authentication database tables
+serverpod migrate apply
+```
+
+This creates:
+- `users` - User accounts
+- `user_images` - User profile images
+- `user_recovery_tokens` - Password reset tokens
+- `user_google_id` - Google OAuth
+- `user_apple_id` - Apple Sign In
+- `signed_in_users` - Active sessions
+
+## Basic Authentication Setup
+
+### Initialize Auth Module
+
+```dart
+// lib/src/server.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_auth_server/serverpod_auth.dart';
+
+class {{pascal_case project_name}}Server extends Server {
+  static late {{pascal_case project_name}}Server shared;
+
+  @override
+  Future<void> initialize() async {
+    // Initialize authentication
+    auth.initializeAuth(
+      server: this,
+      config: AuthConfig(
+        // Enable social sign-ins
+        googleClientId: 'YOUR_GOOGLE_CLIENT_ID',
+        appleKeyId: 'YOUR_APPLE_KEY_ID',
+      ),
+    );
+  }
+}
+```
+
+### Create Auth Endpoint
+
+```dart
+// lib/src/endpoints/auth_endpoint.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_auth_server/serverpod_auth_server.dart';
+
+class AuthEndpoint extends Endpoint {
+  /// Register a new user with email and password
+  Future<UserInfo?> register(
+    Session session, {
+    required String email,
+    required String password,
+    required String name,
+  }) async {
+    final userInfo = await auth.createUser(
+      session,
+      email: email,
+      password: password,
+      fullName: name,
+    );
+
+    return userInfo;
+  }
+
+  /// Login with email and password
+  Future<UserInfo?> login(
+    Session session, {
+    required String email,
+    required String password,
+  }) async {
+    final userInfo = await auth.signInWithEmail(
+      session,
+      email: email,
+      password: password,
+    );
+
+    return userInfo;
+  }
+
+  /// Logout current user
+  Future<void> logout(Session session) async {
+    await auth.signOut(session);
+  }
+
+  /// Get current authenticated user
+  Future<UserInfo?> getCurrentUser(Session session) async {
+    return await auth.getUser(session);
+  }
+
+  /// Request password reset
+  Future<void> requestPasswordReset(
+    Session session, {
+    required String email,
+  }) async {
+    await auth.requestPasswordReset(session, email: email);
+  }
+
+  /// Reset password with token
+  Future<bool> resetPassword(
+    Session session, {
+    required String token,
+    required String newPassword,
+  }) async {
+    return await auth.resetPassword(
+      session,
+      token: token,
+      newPassword: newPassword,
+    );
+  }
+}
+```
+
+## Protected Endpoints
+
+### Require Authentication
+
+```dart
+// lib/src/endpoints/profile_endpoint.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_auth_server/serverpod_auth_server.dart';
+
+class ProfileEndpoint extends Endpoint {
+  /// Get user profile (requires authentication)
+  Future<UserProfile?> getProfile(Session session) async {
+    // Check if user is authenticated
+    final authUser = await session.authenticatedUserId;
+    if (authUser == null) {
+      throw UnauthorizedException('User not authenticated');
+    }
+
+    // Fetch user profile
+    return await UserProfile.findById(session, authUser);
+  }
+
+  /// Update user profile
+  Future<UserProfile?> updateProfile(
+    Session session, {
+    String? name,
+    String? bio,
+  }) async {
+    final authUser = await session.authenticatedUserId;
+    if (authUser == null) {
+      throw UnauthorizedException('User not authenticated');
+    }
+
+    final profile = await UserProfile.findById(session, authUser);
+    if (profile == null) {
+      throw NotFoundException('Profile not found');
+    }
+
+    if (name != null) profile.name = name;
+    if (bio != null) profile.bio = bio;
+
+    await session.db.updateRow(profile);
+
+    return profile;
+  }
+}
+```
+
+### Custom Authentication Check
+
+```dart
+// lib/src/middleware/auth_middleware.dart
+import 'package:serverpod/serverpod.dart';
+
+extension AuthExtension on Session {
+  /// Get authenticated user or throw
+  Future<int> requireUserId() async {
+    final userId = await authenticatedUserId;
+    if (userId == null) {
+      throw UnauthorizedException('Authentication required');
+    }
+    return userId;
+  }
+
+  /// Check if user has specific scope/permission
+  Future<bool> hasScope(String scope) async {
+    final userInfo = await auth.getUser(this);
+    return userInfo?.scopes.contains(scope) ?? false;
+  }
+
+  /// Require specific scope or throw
+  Future<void> requireScope(String scope) async {
+    if (!await hasScope(scope)) {
+      throw ForbiddenException('Missing required scope: $scope');
+    }
+  }
+}
+```
+
+## Role-Based Access Control (RBAC)
+
+### Define Roles
+
+```dart
+// lib/src/models/roles.dart
+class AppRoles {
+  static const String admin = 'admin';
+  static const String moderator = 'moderator';
+  static const String user = 'user';
+  static const String guest = 'guest';
+}
+
+class AppScopes {
+  static const String userRead = 'user:read';
+  static const String userWrite = 'user:write';
+  static const String userDelete = 'user:delete';
+  static const String contentModerate = 'content:moderate';
+  static const String adminAccess = 'admin:access';
+}
+```
+
+### Assign Roles on Registration
+
+```dart
+// lib/src/endpoints/auth_endpoint.dart
+Future<UserInfo?> register(
+  Session session, {
+  required String email,
+  required String password,
+  required String name,
+  bool isAdmin = false,
+}) async {
+  // Create user with scopes
+  final scopes = isAdmin
+      ? [AppScopes.userRead, AppScopes.userWrite, AppScopes.adminAccess]
+      : [AppScopes.userRead, AppScopes.userWrite];
+
+  final userInfo = await auth.createUser(
+    session,
+    email: email,
+    password: password,
+    fullName: name,
+    scopes: scopes,
+  );
+
+  // Store custom role
+  await UserRole.insert(session, userId: userInfo!.id, role: AppRoles.user);
+
+  return userInfo;
+}
+```
+
+### Check Permissions
+
+```dart
+// lib/src/endpoints/admin_endpoint.dart
+class AdminEndpoint extends Endpoint {
+  /// Admin-only endpoint
+  Future<SystemStats> getStats(Session session) async {
+    // Require admin scope
+    await session.requireScope(AppScopes.adminAccess);
+
+    // Fetch and return stats
+    return await SystemStats.fetch(session);
+  }
+
+  /// Delete user (admin only)
+  Future<bool> deleteUser(Session session, int userId) async {
+    await session.requireScope(AppScopes.userDelete);
+
+    final deleted = await User.deleteById(session, userId);
+    return deleted > 0;
+  }
+}
+```
+
+## Custom User Model
+
+### Extend User Model
+
+```dart
+// lib/src/protocol/models/custom_user.dart
+import 'package:serverpod/protocol.dart';
+
+class CustomUser extends SerializableModel {
+  int id;
+  String email;
+  String name;
+  String? avatarUrl;
+  DateTime? lastLoginAt;
+  Map<String, dynamic>? preferences;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'email': email,
+    'name': name,
+    'avatarUrl': avatarUrl,
+    'lastLoginAt': lastLoginAt?.toIso8601String(),
+    'preferences': preferences,
+  };
+
+  @override
+  static CustomUser fromJson(Map<String, dynamic> json) => CustomUser(
+    id: json['id'],
+    email: json['email'],
+    name: json['name'],
+    avatarUrl: json['avatarUrl'],
+    lastLoginAt: json['lastLoginAt'] != null
+        ? DateTime.parse(json['lastLoginAt'])
+        : null,
+    preferences: json['preferences'],
+  );
+}
+```
+
+### Sync Custom User Data
+
+```dart
+// lib/src/endpoints/auth_endpoint.dart
+Future<UserInfo?> login(
+  Session session, {
+  required String email,
+  required String password,
+}) async {
+  final userInfo = await auth.signInWithEmail(
+    session,
+    email: email,
+    password: password,
+  );
+
+  if (userInfo != null) {
+    // Update last login
+    await session.db.execute(
+      'UPDATE custom_users SET last_login_at = NOW() WHERE id = @id',
+      parameters: {'id': userInfo.id},
+    );
+  }
+
+  return userInfo;
+}
+```
+
+## Social Authentication
+
+### Google Sign-In
+
+```dart
+// lib/src/endpoints/social_auth_endpoint.dart
+class SocialAuthEndpoint extends Endpoint {
+  /// Authenticate with Google
+  Future<UserInfo?> signInWithGoogle(
+    Session session, {
+    required String idToken,
+  }) async {
+    final userInfo = await auth.signInWithGoogle(
+      session,
+      idToken: idToken,
+    );
+
+    // Create custom user profile if new
+    if (userInfo != null) {
+      final existing = await CustomUser.findById(session, userInfo.id);
+      if (existing == null) {
+        await CustomUser.insert(
+          session,
+          CustomUser(
+            id: userInfo.id,
+            email: userInfo.email,
+            name: userInfo.fullName ?? 'Google User',
+          ),
+        );
+      }
+    }
+
+    return userInfo;
+  }
+}
+```
+
+### Apple Sign-In
+
+```dart
+/// Authenticate with Apple
+Future<UserInfo?> signInWithApple(
+  Session session, {
+  required String identityToken,
+  required String authorizationCode,
+}) async {
+  return await auth.signInWithApple(
+    session,
+    identityToken: identityToken,
+    authorizationCode: authorizationCode,
+  );
+}
+```
+
+## Session Management
+
+### Session Configuration
+
+```dart
+// config/auth.yaml
+session:
+  # Session lifetime
+  duration: 604800  # 7 days in seconds
+
+  # Enable persistent sessions
+  persistent: true
+
+  # Session cookie settings
+  cookie:
+    name: 'serverpod_session'
+    httpOnly: true
+    secure: true
+```
+
+### Manual Session Creation
+
+```dart
+// lib/src/endpoints/session_endpoint.dart
+class SessionEndpoint extends Endpoint {
+  /// Create session for user (e.g., after OAuth)
+  Future<String> createSessionForUser(
+    Session session,
+    int userId,
+  ) async {
+    final userInfo = await UserInfo.findById(session, userId);
+    if (userInfo == null) {
+      throw NotFoundException('User not found');
+    }
+
+    // Create authenticated session
+    final sessionToken = await auth.createSession(session, userInfo);
+
+    return sessionToken;
+  }
+
+  /// Validate session
+  Future<UserInfo?> validateSession(
+    Session session,
+    String sessionToken,
+  ) async {
+    return await auth.validateSession(session, sessionToken);
+  }
+
+  /// Revoke all user sessions
+  Future<void> revokeAllSessions(Session session) async {
+    final userId = await session.requireUserId();
+
+    await session.db.execute(
+      'DELETE FROM signed_in_users WHERE user_id = @userId',
+      parameters: {'userId': userId},
+    );
+  }
+}
+```
+
+## Password Management
+
+### Password Requirements
+
+```dart
+// lib/src/services/password_validator.dart
+class PasswordValidator {
+  static void validate(String password) {
+    if (password.length < 8) {
+      throw ArgumentError('Password must be at least 8 characters');
+    }
+
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      throw ArgumentError('Password must contain uppercase letter');
+    }
+
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      throw ArgumentError('Password must contain lowercase letter');
+    }
+
+    if (!RegExp(r'[0-9]').hasMatch(password)) {
+      throw ArgumentError('Password must contain number');
+    }
+
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) {
+      throw ArgumentError('Password must contain special character');
+    }
+  }
+
+  static double strength(String password) {
+    double score = 0;
+
+    if (password.length >= 8) score += 1;
+    if (password.length >= 12) score += 1;
+    if (RegExp(r'[A-Z]').hasMatch(password)) score += 1;
+    if (RegExp(r'[a-z]').hasMatch(password)) score += 1;
+    if (RegExp(r'[0-9]').hasMatch(password)) score += 1;
+    if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) score += 1;
+
+    return score / 6; // Returns 0.0 to 1.0
+  }
+}
+```
+
+### Password Change
+
+```dart
+// lib/src/endpoints/password_endpoint.dart
+class PasswordEndpoint extends Endpoint {
+  /// Change password (requires current password)
+  Future<bool> changePassword(
+    Session session, {
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final userId = await session.requireUserId();
+
+    // Verify current password
+    final userInfo = await UserInfo.findById(session, userId);
+    if (userInfo == null) {
+      throw NotFoundException('User not found');
+    }
+
+    // Verify current password
+    final verified = await auth.verifyPassword(
+      session,
+      userId: userId,
+      password: currentPassword,
+    );
+
+    if (!verified) {
+      throw UnauthorizedException('Current password is incorrect');
+    }
+
+    // Validate new password
+    PasswordValidator.validate(newPassword);
+
+    // Update password
+    await auth.updatePassword(
+      session,
+      userId: userId,
+      newPassword: newPassword,
+    );
+
+    return true;
+  }
+
+  /// Set password without current (for admin/reset)
+  Future<bool> setPassword(
+    Session session, {
+    required int userId,
+    required String newPassword,
+  }) async {
+    await session.requireScope(AppScopes.adminAccess);
+
+    PasswordValidator.validate(newPassword);
+
+    await auth.updatePassword(
+      session,
+      userId: userId,
+      newPassword: newPassword,
+    );
+
+    return true;
+  }
+}
+```
+
+## Email Verification
+
+### Send Verification Email
+
+```dart
+// lib/src/endpoints/verification_endpoint.dart
+class VerificationEndpoint extends Endpoint {
+  /// Send verification email
+  Future<void> sendVerificationEmail(Session session) async {
+    final userId = await session.requireUserId();
+
+    final userInfo = await UserInfo.findById(session, userId);
+    if (userInfo == null) {
+      throw NotFoundException('User not found');
+    }
+
+    // Generate verification token
+    final token = await auth.createEmailVerificationToken(
+      session,
+      userId: userId,
+    );
+
+    // Send email
+    await EmailService.sendVerificationEmail(
+      email: userInfo.email,
+      token: token,
+    );
+  }
+
+  /// Verify email with token
+  Future<bool> verifyEmail(
+    Session session, {
+    required String token,
+  }) async {
+    return await auth.verifyEmail(session, token: token);
+  }
+}
+```
+
+## Rate Limiting
+
+### Login Rate Limiting
+
+```dart
+// lib/src/middleware/rate_limit.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_redis/serverpod_redis.dart';
+
+class RateLimiter {
+  static Future<void> checkLoginAttempts(
+    Session session,
+    String email,
+  ) async {
+    final redis = session.redis as CloudRedisClient?;
+
+    if (redis == null) {
+      return; // Skip if Redis not available
+    }
+
+    final key = 'login_attempts:$email';
+    final attempts = await redis.get(key);
+
+    if (attempts != null && int.tryParse(attempts) ?? 0 >= 5) {
+      throw RateLimitException('Too many login attempts. Try again later.');
+    }
+
+    // Increment counter
+    await redis.incr(key);
+    await redis.expire(key, 900); // 15 minutes
+  }
+}
+```
+
+## Two-Factor Authentication (2FA)
+
+### TOTP Setup
+
+```dart
+// lib/src/endpoints/two_factor_endpoint.dart
+class TwoFactorEndpoint extends Endpoint {
+  /// Enable 2FA for user
+  Future<String> enable2FA(Session session) async {
+    final userId = await session.requireUserId();
+
+    // Generate TOTP secret
+    final secret = await auth.createTOTPSecret(
+      session,
+      userId: userId,
+    );
+
+    // Return secret and QR code URL
+    return 'otpauth://totp/{{project_name}}:$userId?secret=$secret';
+  }
+
+  /// Verify and confirm 2FA setup
+  Future<bool> confirm2FA(
+    Session session, {
+    required String code,
+  }) async {
+    final userId = await session.requireUserId();
+
+    return await auth.confirmTOTPSetup(
+      session,
+      userId: userId,
+      code: code,
+    );
+  }
+
+  /// Verify 2FA code during login
+  Future<bool> verify2FA(
+    Session session, {
+    required String code,
+  }) async {
+    final userId = await session.requireUserId();
+
+    return await auth.verifyTOTPCode(
+      session,
+      userId: userId,
+      code: code,
+    );
+  }
+
+  /// Disable 2FA
+  Future<bool> disable2FA(
+    Session session, {
+    required String password,
+  }) async {
+    final userId = await session.requireUserId();
+
+    // Verify password before disabling
+    final userInfo = await UserInfo.findById(session, userId);
+    final verified = await auth.verifyPassword(
+      session,
+      userId: userId,
+      password: password,
+    );
+
+    if (!verified) {
+      throw UnauthorizedException('Incorrect password');
+    }
+
+    return await auth.disableTOTP(session, userId: userId);
+  }
+}
+```
+
+## Frontend Integration
+
+### Client-Side Auth
+
+```dart
+// lib/client/auth_client.dart
+import 'package:serverpod_auth_client/serverpod_auth_client.dart';
+
+class AuthClient {
+  late Client client;
+  late AuthenticationClient authClient;
+
+  AuthClient(this.client) {
+    authClient = AuthenticationClient(client);
+  }
+
+  /// Login with email and password
+  Future<bool> login(String email, String password) async {
+    final response = await authClient.signInWithEmail(
+      email,
+      password,
+    );
+
+    return response.success;
+  }
+
+  /// Register new user
+  Future<bool> register(String email, String password, String name) async {
+    final response = await client.auth.register(
+      email: email,
+      password: password,
+      name: name,
+    );
+
+    return response != null;
+  }
+
+  /// Logout
+  Future<void> logout() async {
+    await authClient.signOut();
+  }
+
+  /// Get current user
+  Future<UserInfo?> getCurrentUser() async {
+    return await authClient.getUser();
+  }
+
+  /// Listen to auth changes
+  void onAuthChange(void Function(UserInfo?) callback) {
+    authClient.addListener(callback);
+  }
+}
+```
+
+## Security Best Practices
+
+### 1. Always Hash Passwords
+
+```dart
+// NEVER store plain text passwords
+// ServerPod handles this automatically via auth.createUser()
+```
+
+### 2. Use HTTPS
+
+```dart
+// config/generators.yaml
+server:
+  ssl:
+    enabled: true
+    certificate: /path/to/cert.pem
+    privateKey: /path/to/key.pem
+```
+
+### 3. Validate Input
+
+```dart
+Future<UserInfo?> register(
+  Session session, {
+  required String email,
+  required String password,
+  required String name,
+}) async {
+  // Validate email format
+  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+    throw ArgumentError('Invalid email format');
+  }
+
+  // Validate password strength
+  PasswordValidator.validate(password);
+
+  // Create user
+  return await auth.createUser(...);
+}
+```
+
+### 4. Limit Session Duration
+
+```dart
+// config/auth.yaml
+session:
+  duration: 3600  # 1 hour for sensitive apps
+  persistent: false  # Don't persist sensitive sessions
+```
+
+### 5. Implement Logout Everywhere
+
+```dart
+Future<void> logoutEverywhere(Session session) async {
+  final userId = await session.requireUserId();
+
+  await session.db.execute(
+    'DELETE FROM signed_in_users WHERE user_id = @userId',
+    parameters: {'userId': userId},
+  );
+}
+```
+
+## Testing Authentication
+
+### Test Helper
+
+```dart
+// test/helpers/test_auth.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_auth_server/serverpod_auth_server.dart';
+
+class TestAuthHelper {
+  static Future<UserInfo> createTestUser(
+    Session session, {
+    String? email,
+    String? password,
+  }) async {
+    return await auth.createUser(
+      session,
+      email: email ?? 'test@example.com',
+      password: password ?? 'TestPassword123!',
+      fullName: 'Test User',
+      scopes: [],
+    )!;
+  }
+
+  static Future<Session> createAuthenticatedSession(
+    Session session,
+    int userId,
+  ) async {
+    final userInfo = await UserInfo.findById(session, userId);
+    final newSession = Server().createSession();
+    await newSession.authenticatedUserId = userId;
+    return newSession;
+  }
+
+  static Future<void> cleanupTestUsers(Session session) async {
+    await session.db.execute(
+      "DELETE FROM users WHERE email LIKE '%@test.com'",
+    );
+  }
+}
+```
+
+## Quick Reference
+
+```bash
+# Run auth migrations
+serverpod migrate apply
+
+# Generate auth protocol
+serverpod generate
+
+# Test authentication locally
+dart test test/auth/
+```
+
+```dart
+// Core methods
+auth.createUser()
+auth.signInWithEmail()
+auth.signOut()
+auth.getUser()
+auth.updatePassword()
+auth.requestPasswordReset()
+```
+
+## Related Skills
+
+- **core**: ServerPod fundamentals
+- **endpoints**: Creating protected endpoints
+- **models**: Custom user models
+- **redis**: Session storage and rate limiting
+- **testing**: Testing authenticated endpoints

@@ -1,0 +1,1008 @@
+# ServerPod Webhooks
+
+Webhook handling for {{project_name}} using ServerPod {{serverpod_version}}.
+
+## Overview
+
+Webhooks allow external services to send real-time notifications to your ServerPod application. This skill covers receiving, verifying, and processing webhooks.
+
+{{#uses_webhooks}}
+## Setup
+
+Your project is configured for webhook handling:
+
+**pubspec.yaml:**
+```yaml
+dependencies:
+  crypto: ^3.0.3
+  http: ^1.1.0
+```
+{{/uses_webhooks}}
+
+## Receiving Webhooks
+
+### Create Webhook Endpoint
+
+```dart
+// lib/src/endpoints/webhook_endpoint.dart
+import 'dart:io';
+import 'package:serverpod/serverpod.dart';
+
+class WebhookEndpoint extends Endpoint {
+  /// Generic webhook receiver
+  Future<void> receive(
+    Session session,
+    HttpRequest request, {
+    required String source,
+  }) async {
+    try {
+      // Read raw body
+      final body = await utf8.decoder.bind(request).join();
+
+      // Parse JSON
+      final data = jsonDecode(body);
+
+      // Log webhook
+      session.log('Webhook received from $source: $data');
+
+      // Verify signature (if supported)
+      final signature = request.headers.value('x-webhook-signature');
+      if (signature != null && !_verifySignature(source, body, signature)) {
+        throw UnauthorizedException('Invalid signature');
+      }
+
+      // Process webhook asynchronously
+      _processWebhook(session, source, data);
+
+    } catch (e) {
+      session.log('Webhook processing error: $e');
+      throw ServerpodException(
+        message: 'Webhook processing failed',
+        error: e.toString(),
+      );
+    }
+  }
+
+  void _processWebhook(
+    Session session,
+    String source,
+    Map<String, dynamic> data,
+  ) {
+    switch (source) {
+      case 'stripe':
+        StripeWebhookHandler().handle(session, data);
+        break;
+      case 'github':
+        GitHubWebhookHandler().handle(session, data);
+        break;
+      case 'slack':
+        SlackWebhookHandler().handle(session, data);
+        break;
+      default:
+        session.log('Unknown webhook source: $source');
+    }
+  }
+
+  bool _verifySignature(String source, String body, String signature) {
+    // Implement signature verification
+    return WebhookVerifier.verify(source, body, signature);
+  }
+}
+```
+
+## Webhook Signature Verification
+
+### HMAC Signature Verification
+
+```dart
+// lib/src/services/webhook_verifier.dart
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+
+class WebhookVerifier {
+  static final Map<String, String> _secrets = {
+    'stripe': 'STRIPE_WEBHOOK_SECRET',
+    'github': 'GITHUB_WEBHOOK_SECRET',
+    'slack': 'SLACK_SIGNING_SECRET',
+  };
+
+  static bool verify(String source, String body, String signature) {
+    final secret = _secrets[source];
+    if (secret == null) {
+      return false; // Unknown source
+    }
+
+    // Calculate expected signature
+    final key = utf8.encode(secret);
+    final hmac = Hmac(sha256, key);
+    final digest = hmac.convert(utf8.encode(body));
+
+    // Compare with received signature
+    final expectedSignature = 'sha256=$digest';
+
+    return _constantTimeEquals(signature, expectedSignature);
+  }
+
+  static bool _constantTimeEquals(String a, String b) {
+    if (a.length != b.length) {
+      return false;
+    }
+
+    int result = 0;
+    for (int i = 0; i < a.length; i++) {
+      result |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
+    }
+
+    return result == 0;
+  }
+}
+```
+
+### Stripe Webhook Verification
+
+```dart
+// lib/src/services/stripe_webhook_verifier.dart
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+
+class StripeWebhookVerifier {
+  static bool verify({
+    required String payload,
+    required String signature,
+    required String secret,
+  }) {
+    // Stripe signature format: t=timestamp,v1=signature
+    final elements = signature.split(',');
+    if (elements.length != 2) {
+      return false;
+    }
+
+    final timestamp = elements[0].split('=')[1];
+    final receivedSignature = elements[1].split('=')[1];
+
+    // Check timestamp (prevent replay attacks)
+    final webhookTime = int.tryParse(timestamp);
+    if (webhookTime == null) {
+      return false;
+    }
+
+    final currentTime = DateTime.now().millisecondsSinceSeconds ~/ 1000;
+    if (currentTime - webhookTime > 300) {
+      // More than 5 minutes old
+      return false;
+    }
+
+    // Calculate expected signature
+    final signedPayload = '$timestamp.$payload';
+    final key = utf8.encode(secret);
+    final hmac = Hmac(sha256, key);
+    final digest = hmac.convert(utf8.encode(signedPayload));
+
+    return _constantTimeEquals(receivedSignature, digest.toString());
+  }
+
+  static bool _constantTimeEquals(String a, String b) {
+    if (a.length != b.length) return false;
+
+    int result = 0;
+    for (int i = 0; i < a.length; i++) {
+      result |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
+    }
+
+    return result == 0;
+  }
+}
+```
+
+## Webhook Handlers
+
+### Stripe Webhook Handler
+
+```dart
+// lib/src/handlers/stripe_webhook_handler.dart
+import 'package:serverpod/serverpod.dart';
+
+class StripeWebhookHandler {
+  Future<void> handle(Session session, Map<String, dynamic> event) async {
+    final eventType = event['type'] as String;
+    final data = event['data']['object'] as Map<String, dynamic>;
+
+    session.log('Processing Stripe event: $eventType');
+
+    switch (eventType) {
+      case 'payment_intent.succeeded':
+        await _handlePaymentSuccess(session, data);
+        break;
+
+      case 'payment_intent.failed':
+        await _handlePaymentFailure(session, data);
+        break;
+
+      case 'customer.subscription.created':
+        await _handleSubscriptionCreated(session, data);
+        break;
+
+      case 'customer.subscription.deleted':
+        await _handleSubscriptionDeleted(session, data);
+        break;
+
+      case 'invoice.paid':
+        await _handleInvoicePaid(session, data);
+        break;
+
+      default:
+        session.log('Unhandled Stripe event: $eventType');
+    }
+
+    // Store webhook event
+    await WebhookEvent.insert(session, WebhookEvent(
+      source: 'stripe',
+      eventType: eventType,
+      payload: event,
+      processedAt: DateTime.now(),
+    ));
+  }
+
+  Future<void> _handlePaymentSuccess(
+    Session session,
+    Map<String, dynamic> data,
+  ) async {
+    final paymentIntentId = data['id'] as String;
+    final customerId = data['customer'] as String?;
+
+    // Update order/payment status
+    await session.db.execute(
+      'UPDATE payments SET status = @status WHERE stripe_payment_intent_id = @id',
+      parameters: {
+        'status': 'succeeded',
+        'id': paymentIntentId,
+      },
+    );
+
+    // Trigger fulfillment
+    if (customerId != null) {
+      await FulfillmentService.processPayment(session, paymentIntentId);
+    }
+
+    session.log('Payment succeeded: $paymentIntentId');
+  }
+
+  Future<void> _handlePaymentFailure(
+    Session session,
+    Map<String, dynamic> data,
+  ) async {
+    final paymentIntentId = data['id'] as String;
+    final errorMessage = data['last_payment_error']?['message'] as String?;
+
+    await session.db.execute(
+      'UPDATE payments SET status = @status, error_message = @error WHERE stripe_payment_intent_id = @id',
+      parameters: {
+        'status': 'failed',
+        'error': errorMessage,
+        'id': paymentIntentId,
+      },
+    );
+
+    session.log('Payment failed: $paymentIntentId - $errorMessage');
+  }
+
+  Future<void> _handleSubscriptionCreated(
+    Session session,
+    Map<String, dynamic> data,
+  ) async {
+    final subscriptionId = data['id'] as String;
+    final customerId = data['customer'] as String;
+
+    // Create subscription record
+    await Subscription.insert(session, Subscription(
+      stripeSubscriptionId: subscriptionId,
+      stripeCustomerId: customerId,
+      status: data['status'] as String,
+      currentPeriodEnd: DateTime.parse(data['current_period_end']),
+    ));
+
+    session.log('Subscription created: $subscriptionId');
+  }
+
+  Future<void> _handleSubscriptionDeleted(
+    Session session,
+    Map<String, dynamic> data,
+  ) async {
+    final subscriptionId = data['id'] as String;
+
+    await session.db.execute(
+      'UPDATE subscriptions SET status = @status, cancelled_at = NOW() WHERE stripe_subscription_id = @id',
+      parameters: {
+        'status': 'cancelled',
+        'id': subscriptionId,
+      },
+    );
+
+    session.log('Subscription cancelled: $subscriptionId');
+  }
+
+  Future<void> _handleInvoicePaid(
+    Session session,
+    Map<String, dynamic> data,
+  ) async {
+    final subscriptionId = data['subscription'] as String?;
+
+    if (subscriptionId != null) {
+      // Extend subscription
+      await session.db.execute(
+        'UPDATE subscriptions SET current_period_end = @endDate WHERE stripe_subscription_id = @id',
+        parameters: {
+          'endDate': data['period_end'],
+          'id': subscriptionId,
+        },
+      );
+    }
+
+    session.log('Invoice paid for subscription: $subscriptionId');
+  }
+}
+```
+
+### GitHub Webhook Handler
+
+```dart
+// lib/src/handlers/github_webhook_handler.dart
+import 'package:serverpod/serverpod.dart';
+
+class GitHubWebhookHandler {
+  Future<void> handle(Session session, Map<String, dynamic> event) async {
+    final eventType = event['event'] as String? ?? 'unknown';
+
+    session.log('Processing GitHub event: $eventType');
+
+    switch (eventType) {
+      case 'push':
+        await _handlePush(session, event);
+        break;
+
+      case 'pull_request':
+        await _handlePullRequest(session, event);
+        break;
+
+      case 'ping':
+        session.log('GitHub webhook ping received');
+        break;
+
+      default:
+        session.log('Unhandled GitHub event: $eventType');
+    }
+
+    // Store webhook event
+    await WebhookEvent.insert(session, WebhookEvent(
+      source: 'github',
+      eventType: eventType,
+      payload: event,
+      processedAt: DateTime.now(),
+    ));
+  }
+
+  Future<void> _handlePush(
+    Session session,
+    Map<String, dynamic> event,
+  ) async {
+    final repository = event['repository']['full_name'] as String;
+    final ref = event['ref'] as String;
+    final pusher = event['pusher']['name'] as String;
+    final commits = event['commits'] as List;
+
+    session.log('Push to $repository:$ref by $pusher');
+
+    // Trigger CI/CD pipeline
+    await DeploymentService.triggerBuild(
+      session,
+      repository: repository,
+      branch: ref.replaceFirst('refs/heads/', ''),
+      commit: commits.last['id'],
+    );
+  }
+
+  Future<void> _handlePullRequest(
+    Session session,
+    Map<String, dynamic> event,
+  ) async {
+    final action = event['action'] as String;
+    final pr = event['pull_request'];
+    final prNumber = pr['number'] as int;
+    final title = pr['title'] as String;
+
+    session.log('PR #$prNumber: $action - $title');
+
+    // Handle PR actions
+    switch (action) {
+      case 'opened':
+      case 'synchronize':
+        // Run CI checks
+        await DeploymentService.triggerPRCheck(session, prNumber);
+        break;
+
+      case 'closed':
+        if (pr['merged'] == true) {
+          // Deploy merged PR
+          await DeploymentService.deployMerge(session, prNumber);
+        }
+        break;
+    }
+  }
+}
+```
+
+### Slack Webhook Handler
+
+```dart
+// lib/src/handlers/slack_webhook_handler.dart
+import 'package:serverpod/serverpod.dart';
+
+class SlackWebhookHandler {
+  Future<void> handle(Session session, Map<String, dynamic> event) async {
+    final type = event['type'] as String? ?? 'unknown';
+
+    session.log('Processing Slack event: $type');
+
+    switch (type) {
+      case 'url_verification':
+        await _handleUrlVerification(session, event);
+        break;
+
+      case 'event_callback':
+        await _handleEventCallback(session, event['event']);
+        break;
+
+      case 'interactive':
+        await _handleInteractive(session, event);
+        break;
+
+      default:
+        session.log('Unhandled Slack event type: $type');
+    }
+
+    await WebhookEvent.insert(session, WebhookEvent(
+      source: 'slack',
+      eventType: type,
+      payload: event,
+      processedAt: DateTime.now(),
+    ));
+  }
+
+  Future<void> _handleUrlVerification(
+    Session session,
+    Map<String, dynamic> event,
+  ) async {
+    // Respond to Slack's URL verification challenge
+    final challenge = event['challenge'] as String;
+
+    // This should be returned as the response
+    session.log('Slack URL verification: $challenge');
+  }
+
+  Future<void> _handleEventCallback(
+    Session session,
+    Map<String, dynamic> innerEvent,
+  ) async {
+    final eventType = innerEvent['type'] as String;
+
+    switch (eventType) {
+      case 'message':
+        await _handleMessage(session, innerEvent);
+        break;
+
+      case 'app_mention':
+        await _handleAppMention(session, innerEvent);
+        break;
+
+      default:
+        session.log('Unhandled Slack event: $eventType');
+    }
+  }
+
+  Future<void> _handleMessage(
+    Session session,
+    Map<String, dynamic> event,
+  ) async {
+    final text = event['text'] as String?;
+    final user = event['user'] as String?;
+    final channel = event['channel'] as String?;
+
+    session.log('Message from $user in $channel: $text');
+
+    // Process commands or store for bot
+    if (text != null && text.startsWith('/')) {
+      await CommandService.handleSlackCommand(
+        session,
+        user: user,
+        channel: channel,
+        command: text,
+      );
+    }
+  }
+
+  Future<void> _handleAppMention(
+    Session session,
+    Map<String, dynamic> event,
+  ) async {
+    final text = event['text'] as String?;
+    final user = event['user'] as String?;
+    final channel = event['channel'] as String?;
+
+    session.log('App mention by $user: $text');
+
+    // Handle bot mention
+    await BotService.handleMention(
+      session,
+      user: user,
+      channel: channel,
+      text: text,
+    );
+  }
+
+  Future<void> _handleInteractive(
+    Session session,
+    Map<String, dynamic> event,
+  ) async {
+    final actions = event['actions'] as List?;
+    final callbackId = event['callback_id'] as String?;
+
+    session.log('Interactive action: $callbackId');
+
+    // Handle button clicks, menu selections, etc.
+    if (callbackId != null) {
+      await InteractionService.handleCallback(session, callbackId, event);
+    }
+  }
+}
+```
+
+## Webhook Storage
+
+### Webhook Event Model
+
+```dart
+// lib/src/protocol/models/webhook_event.dart
+import 'package:serverpod/protocol.dart';
+
+class WebhookEvent extends SerializableModel {
+  int? id;
+  String source; // 'stripe', 'github', 'slack', etc.
+  String eventType;
+  Map<String, dynamic> payload;
+  DateTime receivedAt;
+  DateTime? processedAt;
+  String? errorMessage;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'source': source,
+    'eventType': eventType,
+    'payload': payload,
+    'receivedAt': receivedAt.toIso8601String(),
+    'processedAt': processedAt?.toIso8601String(),
+    'errorMessage': errorMessage,
+  };
+
+  @override
+  static WebhookEvent fromJson(Map<String, dynamic> json) => WebhookEvent(
+    id: json['id'],
+    source: json['source'],
+    eventType: json['eventType'],
+    payload: json['payload'],
+    receivedAt: DateTime.parse(json['receivedAt']),
+    processedAt: json['processedAt'] != null
+        ? DateTime.parse(json['processedAt'])
+        : null,
+    errorMessage: json['errorMessage'],
+  );
+}
+```
+
+### Webhook Log Table
+
+```sql
+-- migrations/migration/20240101000000_create_webhook_events.sql
+CREATE TABLE webhook_events (
+    id SERIAL PRIMARY KEY,
+    source VARCHAR(50) NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    payload JSONB NOT NULL,
+    received_at TIMESTAMPTZ DEFAULT NOW(),
+    processed_at TIMESTAMPTZ,
+    error_message TEXT
+);
+
+CREATE INDEX idx_webhook_events_source ON webhook_events(source);
+CREATE INDEX idx_webhook_events_type ON webhook_events(event_type);
+CREATE INDEX idx_webhook_events_received ON webhook_events(received_at);
+```
+
+## Retry Logic
+
+### Retry Failed Webhooks
+
+```dart
+// lib/src/services/webhook_retry_service.dart
+import 'package:serverpod/serverpod.dart';
+
+class WebhookRetryService {
+  static Future<void> retryFailed(Session session) async {
+    // Get failed webhooks
+    final failedEvents = await session.db.find(
+      query: (t) => WebhookEvent.t.errorMessage.isNotNull(),
+      limit: 10,
+    );
+
+    for (final event in failedEvents) {
+      try {
+        session.log('Retrying webhook ${event.id} from ${event.source}');
+
+        // Retry processing
+        await _retryWebhook(session, event);
+
+        // Clear error
+        event.errorMessage = null;
+        event.processedAt = DateTime.now();
+        await session.db.updateRow(event);
+
+      } catch (e) {
+        session.log('Retry failed for webhook ${event.id}: $e');
+        event.errorMessage = 'Retry failed: $e';
+        await session.db.updateRow(event);
+      }
+    }
+  }
+
+  static Future<void> _retryWebhook(
+    Session session,
+    WebhookEvent event,
+  ) async {
+    switch (event.source) {
+      case 'stripe':
+        await StripeWebhookHandler().handle(session, event.payload);
+        break;
+      case 'github':
+        await GitHubWebhookHandler().handle(session, event.payload);
+        break;
+      case 'slack':
+        await SlackWebhookHandler().handle(session, event.payload);
+        break;
+    }
+  }
+}
+```
+
+## Sending Webhooks
+
+### Webhook Sender Service
+
+```dart
+// lib/src/services/webhook_sender.dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+class WebhookSender {
+  static Future<bool> send({
+    required String url,
+    required Map<String, dynamic> payload,
+    String? secret,
+  }) async {
+    try {
+      final body = jsonEncode(payload);
+
+      // Prepare headers
+      final headers = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add signature if secret provided
+      if (secret != null) {
+        final signature = _generateSignature(body, secret);
+        headers['x-webhook-signature'] = signature;
+      }
+
+      // Send webhook
+      final response = await http.post(
+        Uri.parse(url),
+        headers: headers,
+        body: body,
+      );
+
+      return response.statusCode >= 200 && response.statusCode < 300;
+
+    } catch (e) {
+      print('Failed to send webhook: $e');
+      return false;
+    }
+  }
+
+  static String _generateSignature(String body, String secret) {
+    final key = utf8.encode(secret);
+    final hmac = Hmac(sha256, key);
+    final digest = hmac.convert(utf8.encode(body));
+    return 'sha256=$digest';
+  }
+}
+```
+
+### Trigger Webhooks from Events
+
+```dart
+// lib/src/endpoints/order_endpoint.dart
+class OrderEndpoint extends Endpoint {
+  Future<Order> createOrder(Session session, OrderData data) async {
+    // Create order
+    final order = await session.db.insertRow(Order.fromData(data));
+
+    // Trigger webhooks
+    await _triggerWebhook(session, 'order.created', order);
+
+    return order;
+  }
+
+  Future<void> _triggerWebhook(
+    Session session,
+    String eventType,
+    Order order,
+  ) async {
+    // Get active webhook subscriptions
+    final subscriptions = await session.db.find(
+      query: (t) => WebhookSubscription.t
+          .eventTypes.contains(eventType)
+          .isActive.equals(true),
+    );
+
+    // Send to all subscribers
+    for (final sub in subscriptions) {
+      await WebhookSender.send(
+        url: sub.url,
+        payload: {
+          'event': eventType,
+          'data': order.toJson(),
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+        secret: sub.secret,
+      );
+    }
+  }
+}
+```
+
+## Webhook Dashboard
+
+### Webhook Monitoring Endpoint
+
+```dart
+// lib/src/endpoints/webhook_dashboard_endpoint.dart
+class WebhookDashboardEndpoint extends Endpoint {
+  /// Get webhook statistics
+  Future<WebhookStats> getStats(Session session) async {
+    final total = await session.db.execute(
+      'SELECT COUNT(*) as count FROM webhook_events',
+    );
+
+    final failed = await session.db.execute(
+      'SELECT COUNT(*) as count FROM webhook_events WHERE error_message IS NOT NULL',
+    );
+
+    final recent = await session.db.find(
+      query: (t) => WebhookEvent.t,
+      orderBy: (t) => t.receivedAt,
+      ordering: Ordering.desc,
+      limit: 10,
+    );
+
+    return WebhookStats(
+      total: total.first['count'] as int,
+      failed: failed.first['count'] as int,
+      recent: recent,
+    );
+  }
+
+  /// Get webhook logs with filtering
+  Future<List<WebhookEvent>> getLogs(
+    Session session, {
+    String? source,
+    String? eventType,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    return await session.db.find(
+      query: (t) {
+        var q = WebhookEvent.t;
+
+        if (source != null) {
+          q = q.source.equals(source);
+        }
+        if (eventType != null) {
+          q = q.eventType.equals(eventType);
+        }
+        if (startDate != null) {
+          q = q.receivedAt.greaterOrEqual(startDate);
+        }
+        if (endDate != null) {
+          q = q.receivedAt.lessOrEqual(endDate);
+        }
+
+        return q;
+      },
+      orderBy: (t) => t.receivedAt,
+      ordering: Ordering.desc,
+      limit: 100,
+    );
+  }
+}
+```
+
+## Best Practices
+
+### 1. Always Verify Signatures
+
+```dart
+// Good: Verify before processing
+if (!WebhookVerifier.verify(source, body, signature)) {
+  throw UnauthorizedException('Invalid signature');
+}
+
+// Bad: Trust all webhooks
+// This allows malicious actors to fake events
+```
+
+### 2. Process Asynchronously
+
+```dart
+// Good: Queue webhook for background processing
+Future<void> receive(Session session, HttpRequest request) async {
+  final body = await request.body;
+  _queueForProcessing(session, body);
+  return; // Return immediately
+}
+
+// Bad: Process synchronously
+// Slow processing can cause timeouts
+```
+
+### 3. Handle Idempotency
+
+```dart
+// Use idempotency keys to prevent duplicate processing
+Future<void> _processPayment(Session session, Map<String, dynamic> data) async {
+  final idempotencyKey = data['id'] as String;
+
+  final existing = await Payment.findByIdempotencyKey(session, idempotencyKey);
+  if (existing != null) {
+    return; // Already processed
+  }
+
+  // Process payment
+  await Payment.create(session, data, idempotencyKey: idempotencyKey);
+}
+```
+
+### 4. Log Everything
+
+```dart
+session.log('Webhook received: source=$source, type=$eventType, id=$webhookId');
+
+// Store raw payload for debugging
+await WebhookEvent.insert(session, WebhookEvent(
+  source: source,
+  eventType: eventType,
+  payload: payload,
+  receivedAt: DateTime.now(),
+));
+```
+
+### 5. Use Time-Safe Comparison
+
+```dart
+// Good: Constant-time comparison
+return _constantTimeEquals(receivedSignature, expectedSignature);
+
+// Bad: Regular string comparison (vulnerable to timing attacks)
+return receivedSignature == expectedSignature;
+```
+
+## Testing Webhooks
+
+### Test Webhook Handler
+
+```dart
+// test/handlers/stripe_webhook_test.dart
+import 'package:test/test.dart';
+import 'package:{{project_name}}/handlers/stripe_webhook_handler.dart';
+
+void main() {
+  group('StripeWebhookHandler', () {
+    test('should handle payment succeeded event', () async {
+      final handler = StripeWebhookHandler();
+      final session = createTestSession();
+
+      final event = {
+        'type': 'payment_intent.succeeded',
+        'data': {
+          'object': {
+            'id': 'pi_test_123',
+            'customer': 'cus_test_456',
+            'amount': 1000,
+          },
+        },
+      };
+
+      await handler.handle(session, event);
+
+      // Verify payment was updated
+      final payment = await Payment.findByStripeId(session, 'pi_test_123');
+      expect(payment?.status, equals('succeeded'));
+    });
+
+    test('should handle invalid event gracefully', () async {
+      final handler = StripeWebhookHandler();
+      final session = createTestSession();
+
+      final event = {'type': 'unknown', 'data': {}};
+
+      // Should not throw
+      await expectLater(
+        () => handler.handle(session, event),
+        returnsNormally,
+      );
+    });
+  });
+}
+```
+
+### Local Webhook Testing
+
+```dart
+// test/helpers/webhook_test_helper.dart
+class WebhookTestHelper {
+  static Future<http.Response> sendTestWebhook({
+    required String url,
+    required String source,
+    required Map<String, dynamic> payload,
+    String? secret,
+  }) async {
+    final body = jsonEncode(payload);
+    final headers = {'Content-Type': 'application/json'};
+
+    if (secret != null) {
+      final signature = WebhookTestHelper._generateSignature(body, secret);
+      headers['x-webhook-signature'] = signature;
+    }
+
+    return await http.post(
+      Uri.parse(url),
+      headers: headers,
+      body: body,
+    );
+  }
+}
+```
+
+## Quick Reference
+
+```dart
+// Receive webhook
+await WebhookEndpoint().receive(session, request, source: 'stripe');
+
+// Verify signature
+WebhookVerifier.verify(source, body, signature);
+
+// Process webhook
+StripeWebhookHandler().handle(session, event);
+
+// Send webhook
+await WebhookSender.send(url: url, payload: data, secret: secret);
+
+// Retry failed webhooks
+await WebhookRetryService.retryFailed(session);
+```
+
+## Related Skills
+
+- **endpoints**: Creating webhook endpoints
+- **redis**: Queue webhook processing
+- **testing**: Testing webhook handlers
+- **models**: Webhook event storage

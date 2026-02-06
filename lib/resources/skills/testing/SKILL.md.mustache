@@ -1,0 +1,675 @@
+# ServerPod Testing
+
+Comprehensive testing guide for {{project_name}} using ServerPod {{serverpod_version}}.
+
+## Overview
+
+ServerPod uses Dart's built-in testing framework. This skill covers unit tests, integration tests, and endpoint testing patterns.
+
+{{#uses_test}}
+## Test Setup
+
+Your project is configured with the test package:
+
+**pubspec.yaml:**
+```yaml
+dev_dependencies:
+  test: ^1.24.0
+  serverpod: ^{{serverpod_version}}
+  serverpod_test: ^{{serverpod_version}}
+```
+{{/uses_test}}
+
+## Project Structure
+
+```
+lib/
+├── src/
+│   ├── endpoints/
+│   │   └── my_endpoint.dart
+│   └── models/
+│       └── my_model.dart
+test/
+├── endpoints/
+│   └── my_endpoint_test.dart
+├── models/
+│   └── my_model_test.dart
+└── integration/
+    └── app_test.dart
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+dart test
+
+# Run specific test file
+dart test test/endpoints/my_endpoint_test.dart
+
+# Run with coverage
+dart test --coverage=coverage
+
+# Run tests in a specific file matching pattern
+dart test test/endpoints/*_test.dart
+
+# Watch mode (re-run on changes)
+dart test --watch
+```
+
+## Unit Testing
+
+### Testing Models
+
+```dart
+// test/models/user_test.dart
+import 'package:test/test.dart';
+import 'package:{{project_name}}/models/user.dart';
+
+void main() {
+  group('User Model', () {
+    test('should create user with required fields', () {
+      final user = User(
+        id: 1,
+        email: 'test@example.com',
+        name: 'Test User',
+      );
+
+      expect(user.id, equals(1));
+      expect(user.email, equals('test@example.com'));
+      expect(user.name, equals('Test User'));
+    });
+
+    test('should serialize to JSON correctly', () {
+      final user = User(
+        id: 1,
+        email: 'test@example.com',
+        name: 'Test User',
+      );
+
+      final json = user.toJson();
+
+      expect(json['id'], equals(1));
+      expect(json['email'], equals('test@example.com'));
+      expect(json['name'], equals('Test User'));
+    });
+
+    test('should deserialize from JSON correctly', () {
+      final json = {
+        'id': 1,
+        'email': 'test@example.com',
+        'name': 'Test User',
+      };
+
+      final user = User.fromJson(json);
+
+      expect(user.id, equals(1));
+      expect(user.email, equals('test@example.com'));
+      expect(user.name, equals('Test User'));
+    });
+
+    test('should validate email format', () {
+      expect(
+        () => User(id: 1, email: 'invalid-email', name: 'Test'),
+        throwsA(isA<ArgumentException>()),
+      );
+    });
+  });
+}
+```
+
+### Testing Business Logic
+
+```dart
+// test/services/calculator_test.dart
+import 'package:test/test.dart';
+
+void main() {
+  group('Calculator', () {
+    test('should add two numbers', () {
+      expect(add(2, 3), equals(5));
+    });
+
+    test('should handle division by zero', () {
+      expect(
+        () => divide(10, 0),
+        throwsA(isA<DivisionByZeroException>()),
+      );
+    });
+
+    test('should calculate percentage', () {
+      expect(calculatePercentage(50, 200), equals(25.0));
+    });
+  });
+}
+```
+
+## Endpoint Testing
+
+### Basic Endpoint Test
+
+```dart
+// test/endpoints/user_endpoint_test.dart
+import 'package:test/test.dart';
+import 'package:serverpod/serverpod.dart';
+import 'package:{{project_name}}/endpoints/user_endpoint.dart';
+import 'package:{{project_name}}/models/user.dart';
+
+void main() {
+  group('UserEndpoint', () {
+    late Session session;
+    late UserEndpoint endpoint;
+
+    setUp(() {
+      // Create a test session
+      session = server.createSession(enableLogging: false);
+      endpoint = UserEndpoint();
+    });
+
+    test('should create a new user', () async {
+      final result = await endpoint.createUser(
+        session,
+        email: 'test@example.com',
+        name: 'Test User',
+      );
+
+      expect(result, isNotNull);
+      expect(result.email, equals('test@example.com'));
+      expect(result.name, equals('Test User'));
+    });
+
+    test('should get user by ID', () async {
+      // First create a user
+      final created = await endpoint.createUser(
+        session,
+        email: 'test@example.com',
+        name: 'Test User',
+      );
+
+      // Then fetch them
+      final fetched = await endpoint.getUser(session, created.id!);
+
+      expect(fetched, isNotNull);
+      expect(fetched.id, equals(created.id));
+      expect(fetched.email, equals('test@example.com'));
+    });
+
+    test('should return null for non-existent user', () async {
+      final result = await endpoint.getUser(session, 99999);
+
+      expect(result, isNull);
+    });
+
+    tearDown(() async {
+      // Cleanup test data
+      await session.db.execute('DELETE FROM users WHERE email = @email',
+          parameters: {'email': 'test@example.com'});
+    });
+  });
+}
+```
+
+### Testing with Mock Data
+
+```dart
+// test/endpoints/order_endpoint_test.dart
+import 'package:test/test.dart';
+import 'package:serverpod/serverpod.dart';
+import 'package:{{project_name}}/endpoints/order_endpoint.dart';
+
+void main() {
+  group('OrderEndpoint', () {
+    late Session session;
+    late OrderEndpoint endpoint;
+    late User testUser;
+
+    setUpAll(() async {
+      session = server.createSession(enableLogging: false);
+      endpoint = OrderEndpoint();
+
+      // Create test user once for all tests
+      testUser = await session.db.insertRow(User(
+        email: 'test@example.com',
+        name: 'Test User',
+      ));
+    });
+
+    test('should create order for user', () async {
+      final order = await endpoint.createOrder(
+        session,
+        userId: testUser.id!,
+        items: [
+          OrderItem(productId: 1, quantity: 2),
+          OrderItem(productId: 2, quantity: 1),
+        ],
+      );
+
+      expect(order, isNotNull);
+      expect(order.userId, equals(testUser.id));
+      expect(order.items.length, equals(2));
+    });
+
+    tearDownAll(() async {
+      // Cleanup all test data
+      await session.db.execute('DELETE FROM users WHERE id = @id',
+          parameters: {'id': testUser.id});
+    });
+  });
+}
+```
+
+## Integration Testing
+
+### Full Endpoint Integration Test
+
+```dart
+// test/integration/user_flow_test.dart
+import 'package:test/test.dart';
+import 'package:serverpod/serverpod.dart';
+
+void main() {
+  group('User Flow Integration', () {
+    late Session session;
+
+    setUp(() {
+      session = server.createSession(enableLogging: false);
+    });
+
+    test('should complete full user lifecycle', () async {
+      // 1. Create user
+      final user = await UserEndpoint().createUser(
+        session,
+        email: 'integration@test.com',
+        name: 'Integration Test',
+      );
+      expect(user.id, isNotNull);
+
+      // 2. Update user
+      final updated = await UserEndpoint().updateUser(
+        session,
+        userId: user.id!,
+        name: 'Updated Name',
+      );
+      expect(updated.name, equals('Updated Name'));
+
+      // 3. Delete user
+      final deleted = await UserEndpoint().deleteUser(session, user.id!);
+      expect(deleted, isTrue);
+
+      // 4. Verify deletion
+      final fetched = await UserEndpoint().getUser(session, user.id!);
+      expect(fetched, isNull);
+    });
+
+    tearDown(() async {
+      await session.db.execute(
+        'DELETE FROM users WHERE email = @email',
+        parameters: {'email': 'integration@test.com'},
+      );
+    });
+  });
+}
+```
+
+## Testing Database Operations
+
+### Database Query Tests
+
+```dart
+// test/integration/database_test.dart
+import 'package:test/test.dart';
+import 'package:serverpod/serverpod.dart';
+
+void main() {
+  group('Database Operations', () {
+    late Session session;
+
+    setUp(() {
+      session = server.createSession(enableLogging: false);
+    });
+
+    test('should insert and retrieve row', () async {
+      final user = User(
+        email: 'db@test.com',
+        name: 'DB Test',
+      );
+
+      final inserted = await session.db.insertRow(user);
+      expect(inserted.id, isNotNull);
+
+      final retrieved = await session.db.findById<User, int>(
+        User.t,
+        inserted.id!,
+      );
+
+      expect(retrieved, isNotNull);
+      expect(retrieved?.email, equals('db@test.com'));
+    });
+
+    test('should query with filters', () async {
+      // Insert test data
+      await session.db.insertRow(User(email: 'user1@test.com', name: 'User 1'));
+      await session.db.insertRow(User(email: 'user2@test.com', name: 'User 2'));
+
+      // Query with filter
+      final results = await session.db.find<User>(
+        query: (u) => u.email.like('%@test.com'),
+      );
+
+      expect(results.length, greaterThanOrEqualTo(2));
+    });
+
+    tearDown(() async {
+      await session.db.execute('DELETE FROM users WHERE email LIKE @pattern',
+          parameters: {'pattern': '%@test.com'});
+    });
+  });
+}
+```
+
+## Testing Authentication
+
+### Authenticated Endpoint Tests
+
+```dart
+// test/endpoints/protected_endpoint_test.dart
+import 'package:test/test.dart';
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_auth_server/serverpod_auth_server.dart';
+
+void main() {
+  group('ProtectedEndpoint', () {
+    late Session session;
+    late ProtectedEndpoint endpoint;
+
+    setUp(() {
+      session = server.createSession(enableLogging: false);
+      endpoint = ProtectedEndpoint();
+    });
+
+    test('should allow authenticated user', () async {
+      // Create authenticated session
+      final authSession = await createAuthenticatedSession(
+        session,
+        userId: 1,
+        scopes: ['user:read'],
+      );
+
+      // Call protected endpoint
+      final result = await endpoint.getProtectedData(authSession);
+
+      expect(result, isNotNull);
+    });
+
+    test('should reject unauthenticated user', () async {
+      // Try to access without authentication
+      expect(
+        () => endpoint.getProtectedData(session),
+        throwsA(isA<UnauthorizedException>()),
+      );
+    });
+  });
+}
+```
+
+## Testing WebSockets
+
+### Streaming Endpoint Tests
+
+```dart
+// test/endpoints/streaming_endpoint_test.dart
+import 'package:test/test.dart';
+import 'package:serverpod/serverpod.dart';
+
+void main() {
+  group('StreamingEndpoint', () {
+    test('should stream messages', () async {
+      final session = server.createSession(enableLogging: false);
+      final endpoint = StreamingEndpoint();
+
+      final messages = <String>[];
+
+      // Create subscription
+      final subscription = endpoint.messageStream(session).listen(
+        (message) {
+          messages.add(message);
+        },
+      );
+
+      // Send test messages
+      await endpoint.sendMessage(session, 'Hello');
+      await endpoint.sendMessage(session, 'World');
+
+      // Wait for processing
+      await Future.delayed(Duration(milliseconds: 100));
+
+      // Verify
+      expect(messages, equals(['Hello', 'World']));
+
+      await subscription.cancel();
+    });
+  });
+}
+```
+
+## Mocking and Test Doubles
+
+### Using Mock Classes
+
+```dart
+// test/services/email_service_test.dart
+import 'package:test/test.dart';
+import 'package:mockito/mockito.dart';
+import 'package:{{project_name}}/services/email_service.dart';
+
+class MockEmailService extends Mock implements EmailService {}
+
+void main() {
+  group('EmailService', () {
+    test('should send welcome email', () async {
+      final mockService = MockEmailService();
+
+      await mockService.sendWelcomeEmail('test@example.com');
+
+      verify(mockService.sendWelcomeEmail('test@example.com')).called(1);
+    });
+  });
+}
+```
+
+## Test Utilities
+
+### Helper Functions
+
+```dart
+// test/helpers/test_helpers.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:{{project_name}}/models/user.dart';
+
+class TestHelpers {
+  static Future<User> createTestUser(Session session, {
+    String? email,
+    String? name,
+  }) async {
+    return await session.db.insertRow(User(
+      email: email ?? 'test@example.com',
+      name: name ?? 'Test User',
+    ));
+  }
+
+  static Future<void> cleanupTestData(Session session) async {
+    await session.db.execute('DELETE FROM users WHERE email LIKE @pattern',
+        parameters: {'pattern': '%@test.com'});
+  }
+
+  static Session createTestSession() {
+    return server.createSession(enableLogging: false);
+  }
+}
+```
+
+### Custom Matchers
+
+```dart
+// test/helpers/matchers.dart
+import 'package:test/test.dart';
+
+class UserMatcher extends Matcher {
+  final String expectedEmail;
+
+  UserMatcher(this.expectedEmail);
+
+  @override
+  bool matches(item, Map matchState) {
+    return item is User && item.email == expectedEmail;
+  }
+
+  @override
+  Description describe(Description description) {
+    return description.add('a User with email "$expectedEmail"');
+  }
+}
+
+Matcher isUserWithEmail(String email) => UserMatcher(email);
+```
+
+## Best Practices
+
+### 1. Test Structure (AAA Pattern)
+
+```dart
+test('should calculate total', () {
+  // Arrange
+  final order = Order(items: [
+    OrderItem(price: 10, quantity: 2),
+    OrderItem(price: 5, quantity: 1),
+  ]);
+
+  // Act
+  final total = order.calculateTotal();
+
+  // Assert
+  expect(total, equals(25));
+});
+```
+
+### 2. Descriptive Test Names
+
+```dart
+// Good: Descriptive
+test('should return empty list when user has no orders', () {});
+
+// Bad: Vague
+test('test orders', () {});
+```
+
+### 3. Test Isolation
+
+```dart
+group('UserEndpoint', () {
+  late Session session;
+
+  setUp(() {
+    // Fresh session for each test
+    session = server.createSession(enableLogging: false);
+  });
+
+  tearDown(() async {
+    // Clean up after each test
+    await session.db.execute('DELETE FROM users');
+  });
+});
+```
+
+### 4. Test Edge Cases
+
+```dart
+group('Validation Tests', () {
+  test('should handle empty string', () {});
+  test('should handle null values', () {});
+  test('should handle negative numbers', () {});
+  test('should handle maximum length', () {});
+  test('should handle special characters', () {});
+});
+```
+
+### 5. Use Test Groups
+
+```dart
+void main() {
+  group('Model Tests', () {
+    group('Serialization', () {});
+    group('Validation', () {});
+  });
+
+  group('Endpoint Tests', () {
+    group('Success Cases', () {});
+    group('Error Cases', () {});
+  });
+}
+```
+
+## Continuous Integration
+
+### GitHub Actions Example
+
+```yaml
+# .github/workflows/test.yml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Install dependencies
+        run: dart pub get
+
+      - name: Run tests
+        run: dart test --coverage=coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+```
+
+## Quick Reference
+
+```bash
+# Run all tests
+dart test
+
+# Run with coverage
+dart test --coverage=coverage
+
+# Watch mode
+dart test --watch
+
+# Run specific test
+dart test test/models/user_test.dart
+
+# Run tests matching pattern
+dart test test/endpoints/*_test.dart
+```
+
+## Related Skills
+
+- **core**: ServerPod fundamentals
+- **endpoints**: Testing endpoint methods
+- **models**: Testing data models
+- **migrations**: Database setup for tests

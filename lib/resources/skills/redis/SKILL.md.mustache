@@ -1,0 +1,1143 @@
+# ServerPod Redis
+
+Redis caching and data storage for {{project_name}} using ServerPod {{serverpod_version}}.
+
+## Overview
+
+ServerPod provides built-in Redis support for caching, session storage, pub/sub messaging, and rate limiting. This skill covers Redis integration patterns.
+
+{{#uses_redis}}
+## Setup
+
+Your project uses Redis for caching:
+
+**pubspec.yaml:**
+```yaml
+dependencies:
+  serverpod_redis: ^{{serverpod_version}}
+```
+
+**config/generators.yaml:**
+```yaml
+redis:
+  enabled: true
+  port: 6379
+  host: localhost
+```
+{{/uses_redis}}
+
+## Redis Configuration
+
+### Local Development
+
+```yaml
+# config/redis.yaml
+redis:
+  enabled: true
+  host: localhost
+  port: 6379
+  password: null  # No password for local dev
+  database: 0
+```
+
+### Production (Cloud Redis)
+
+```yaml
+# config/redis_production.yaml
+redis:
+  enabled: true
+  host: your-redis-cluster.example.com
+  port: 6379
+  password: ${REDIS_PASSWORD}  # From environment variable
+  database: 0
+  ssl: true
+  timeout: 5000
+```
+
+### Accessing Redis
+
+```dart
+// lib/src/server.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_redis/serverpod_redis.dart';
+
+class {{pascal_case project_name}}Server extends Server {
+  late CloudRedisClient redis;
+
+  @override
+  Future<void> initialize() async {
+    // Initialize Redis client
+    redis = CloudRedisClient(
+      host: config.redisHost,
+      port: config.redisPort,
+      password: config.redisPassword,
+    );
+
+    // Test connection
+    await redis.ping();
+    print('Redis connected successfully');
+  }
+}
+```
+
+## Basic Operations
+
+### String Operations
+
+```dart
+// lib/src/services/cache_service.dart
+import 'package:serverpod/serverpod.dart';
+import 'package:serverpod_redis/serverpod_redis.dart';
+
+class CacheService {
+  final CloudRedisClient redis;
+
+  CacheService(this.redis);
+
+  /// Set a value with expiration
+  Future<void> set(
+    String key,
+    String value, {
+    Duration? expiration,
+  }) async {
+    if (expiration != null) {
+      await redis.setWithExpiration(key, value, expiration);
+    } else {
+      await redis.set(key, value);
+    }
+  }
+
+  /// Get a value
+  Future<String?> get(String key) async {
+    return await redis.get(key);
+  }
+
+  /// Delete a value
+  Future<void> delete(String key) async {
+    await redis.delete(key);
+  }
+
+  /// Check if key exists
+  Future<bool> exists(String key) async {
+    return await redis.exists(key) > 0;
+  }
+
+  /// Set multiple values
+  Future<void> setMultiple(Map<String, String> values) async {
+    await redis.mset(values);
+  }
+
+  /// Get multiple values
+  Future<List<String?>> getMultiple(List<String> keys) async {
+    return await redis.mget(keys);
+  }
+}
+```
+
+### JSON Operations
+
+```dart
+// Cache complex objects as JSON
+class UserCacheService {
+  final CloudRedisClient redis;
+
+  UserCacheService(this.redis);
+
+  /// Cache user object
+  Future<void> cacheUser(User user, {Duration? ttl}) async {
+    final key = 'user:${user.id}';
+    final json = jsonEncode(user.toJson());
+
+    if (ttl != null) {
+      await redis.setWithExpiration(key, json, ttl);
+    } else {
+      await redis.set(key, json);
+    }
+  }
+
+  /// Get cached user
+  Future<User?> getUser(int userId) async {
+    final key = 'user:$userId';
+    final json = await redis.get(key);
+
+    if (json == null) return null;
+
+    return User.fromJson(jsonDecode(json));
+  }
+
+  /// Cache user profile
+  Future<void> cacheProfile(UserProfile profile, {Duration? ttl}) async {
+    final key = 'profile:${profile.userId}';
+    final json = jsonEncode(profile.toJson());
+
+    if (ttl != null) {
+      await redis.setWithExpiration(key, json, ttl);
+    } else {
+      await redis.set(key, json);
+    }
+  }
+
+  /// Get cached profile
+  Future<UserProfile?> getProfile(int userId) async {
+    final key = 'profile:$userId';
+    final json = await redis.get(key);
+
+    if (json == null) return null;
+
+    return UserProfile.fromJson(jsonDecode(json));
+  }
+}
+```
+
+## Caching Patterns
+
+### Cache-Aside Pattern
+
+```dart
+// lib/src/repositories/product_repository.dart
+class ProductRepository {
+  final Session session;
+  final CloudRedisClient redis;
+
+  ProductRepository(this.session, this.redis);
+
+  /// Get product with cache-aside pattern
+  Future<Product?> getProduct(int productId) async {
+    final cacheKey = 'product:$productId';
+
+    // Try cache first
+    final cached = await redis.get(cacheKey);
+    if (cached != null) {
+      return Product.fromJson(jsonDecode(cached));
+    }
+
+    // Cache miss - fetch from database
+    final product = await session.db.findById<Product, int>(
+      Product.t,
+      productId,
+    );
+
+    // Store in cache for 5 minutes
+    if (product != null) {
+      await redis.setWithExpiration(
+        cacheKey,
+        jsonEncode(product.toJson()),
+        Duration(minutes: 5),
+      );
+    }
+
+    return product;
+  }
+
+  /// Update product and invalidate cache
+  Future<void> updateProduct(Product product) async {
+    // Update database
+    await session.db.updateRow(product);
+
+    // Invalidate cache
+    await redis.delete('product:${product.id}');
+  }
+
+  /// Delete product and cache
+  Future<void> deleteProduct(int productId) async {
+    // Delete from database
+    await session.db.deleteRow(
+      Product.t,
+      productId,
+    );
+
+    // Delete from cache
+    await redis.delete('product:$productId');
+  }
+}
+```
+
+### Write-Through Pattern
+
+```dart
+// lib/src/repositories/user_repository.dart
+class UserRepository {
+  final Session session;
+  final CloudRedisClient redis;
+
+  UserRepository(this.session, this.redis);
+
+  /// Create user (write-through to cache)
+  Future<User> createUser(User user) async {
+    // Insert into database
+    final created = await session.db.insertRow(user);
+
+    // Write to cache
+    await redis.setWithExpiration(
+      'user:${created.id}',
+      jsonEncode(created.toJson()),
+      Duration(minutes: 10),
+    );
+
+    return created;
+  }
+}
+```
+
+### Read-Through Pattern
+
+```dart
+// lib/src/services/read_through_cache.dart
+class ReadThroughCache {
+  final CloudRedisClient redis;
+
+  ReadThroughCache(this.redis);
+
+  /// Get data with read-through caching
+  Future<T?> get<T>(
+    String key,
+    Future<T?> Function() fetchFromDb, {
+    Duration ttl = const Duration(minutes: 5),
+  }) async {
+    // Try cache
+    final cached = await redis.get(key);
+    if (cached != null) {
+      return jsonDecode(cached) as T;
+    }
+
+    // Fetch from database
+    final data = await fetchFromDb();
+    if (data != null) {
+      // Store in cache
+      await redis.setWithExpiration(
+        key,
+        jsonEncode(data),
+        ttl,
+      );
+    }
+
+    return data;
+  }
+}
+```
+
+## List Operations
+
+### Queue Implementation
+
+```dart
+// lib/src/services/queue_service.dart
+class QueueService {
+  final CloudRedisClient redis;
+
+  QueueService(this.redis);
+
+  /// Push to queue
+  Future<void> push(String queueName, String value) async {
+    await redis.lpush('queue:$queueName', value);
+  }
+
+  /// Pop from queue
+  Future<String?> pop(String queueName) async {
+    return await redis.rpop('queue:$queueName');
+  }
+
+  /// Get queue length
+  Future<int> length(String queueName) async {
+    return await redis.llen('queue:$queueName');
+  }
+
+  /// Get all items in queue
+  Future<List<String>> getAll(String queueName) async {
+    return await redis.lrange('queue:$queueName', 0, -1);
+  }
+
+  /// Clear queue
+  Future<void> clear(String queueName) async {
+    await redis.delete('queue:$queueName');
+  }
+}
+```
+
+### Task Queue
+
+```dart
+// lib/src/services/task_queue.dart
+class TaskQueue {
+  final CloudRedisClient redis;
+
+  TaskQueue(this.redis);
+
+  /// Add task to queue
+  Future<void> addTask(Task task) async {
+    await redis.lpush(
+      'tasks:pending',
+      jsonEncode(task.toJson()),
+    );
+  }
+
+  /// Get next task
+  Future<Task?> getNextTask() async {
+    final json = await redis.rpop('tasks:pending');
+    if (json == null) return null;
+
+    return Task.fromJson(jsonDecode(json));
+  }
+
+  /// Move task to failed queue
+  Future<void> markFailed(Task task) async {
+    await redis.lpush(
+      'tasks:failed',
+      jsonEncode(task.toJson()),
+    );
+  }
+
+  /// Get failed tasks for retry
+  Future<List<Task>> getFailedTasks() async {
+    final jsonList = await redis.lrange('tasks:failed', 0, -1);
+    return jsonList.map((json) => Task.fromJson(jsonDecode(json))).toList();
+  }
+}
+```
+
+## Set Operations
+
+### Unique Collections
+
+```dart
+// lib/src/services/set_service.dart
+class SetService {
+  final CloudRedisClient redis;
+
+  SetService(this.redis);
+
+  /// Add to set
+  Future<void> add(String setName, String value) async {
+    await redis.sadd('set:$setName', value);
+  }
+
+  /// Check if member exists
+  Future<bool> isMember(String setName, String value) async {
+    return await redis.sismember('set:$setName', value);
+  }
+
+  /// Get all members
+  Future<Set<String>> members(String setName) async {
+    final list = await redis.smembers('set:$setName');
+    return list.toSet();
+  }
+
+  /// Remove from set
+  Future<void> remove(String setName, String value) async {
+    await redis.srem('set:$setName', value);
+  }
+
+  /// Get set size
+  Future<int> size(String setName) async {
+    return await redis.scard('set:$setName');
+  }
+
+  /// Union of sets
+  Future<Set<String>> union(List<String> setNames) async {
+    final keys = setNames.map((name) => 'set:$name').toList();
+    final list = await redis.sunion(keys);
+    return list.toSet();
+  }
+
+  /// Intersection of sets
+  Future<Set<String>> intersection(List<String> setNames) async {
+    final keys = setNames.map((name) => 'set:$name').toList();
+    final list = await redis.sinter(keys);
+    return list.toSet();
+  }
+}
+```
+
+### Tag System
+
+```dart
+// lib/src/services/tag_service.dart
+class TagService {
+  final CloudRedisClient redis;
+
+  TagService(this.redis);
+
+  /// Add tag to item
+  Future<void> addTag(int itemId, String tag) async {
+    await redis.sadd('tags:item:$itemId', tag);
+    await redis.sadd('tags:tag:$tag', itemId.toString());
+  }
+
+  /// Get item tags
+  Future<Set<String>> getItemTags(int itemId) async {
+    final tags = await redis.smembers('tags:item:$itemId');
+    return tags.toSet();
+  }
+
+  /// Get items with tag
+  Future<Set<int>> getItemsWithTag(String tag) async {
+    final ids = await redis.smembers('tags:tag:$tag');
+    return ids.map((id) => int.parse(id)).toSet();
+  }
+
+  /// Find items with multiple tags (AND)
+  Future<Set<int>> findItemsWithAllTags(List<String> tags) async {
+    final keys = tags.map((tag) => 'tags:tag:$tag').toList();
+    final ids = await redis.sinter(keys);
+    return ids.map((id) => int.parse(id)).toSet();
+  }
+
+  /// Find items with any tag (OR)
+  Future<Set<int>> findItemsWithAnyTags(List<String> tags) async {
+    final keys = tags.map((tag) => 'tags:tag:$tag').toList();
+    final ids = await redis.sunion(keys);
+    return ids.map((id) => int.parse(id)).toSet();
+  }
+}
+```
+
+## Sorted Sets
+
+### Leaderboard
+
+```dart
+// lib/src/services/leaderboard_service.dart
+class LeaderboardService {
+  final CloudRedisClient redis;
+
+  LeaderboardService(this.redis);
+
+  /// Add score
+  Future<void> addScore(String leaderboard, String userId, double score) async {
+    await redis.zadd('leaderboard:$leaderboard', score, userId);
+  }
+
+  /// Get user rank
+  Future<int?> getUserRank(String leaderboard, String userId) async {
+    final rank = await redis.zrevrank('leaderboard:$leaderboard', userId);
+    // Redis returns 0-based rank, convert to 1-based
+    return rank != null ? rank + 1 : null;
+  }
+
+  /// Get user score
+  Future<double?> getUserScore(String leaderboard, String userId) async {
+    return await redis.zscore('leaderboard:$leaderboard', userId);
+  }
+
+  /// Get top N users
+  Future<List<LeaderboardEntry>> getTopUsers(
+    String leaderboard,
+    int count,
+  ) async {
+    final results = await redis.zrevrangeWithScores(
+      'leaderboard:$leaderboard',
+      0,
+      count - 1,
+    );
+
+    return results.asMap().entries.map((entry) {
+      final index = entry.key;
+      final (userId, score) = entry.value;
+      return LeaderboardEntry(
+        rank: index + 1,
+        userId: userId,
+        score: score,
+      );
+    }).toList();
+  }
+
+  /// Get users around a user
+  Future<List<LeaderboardEntry>> getAroundUser(
+    String leaderboard,
+    String userId, {
+    int count = 5,
+  }) async {
+    final rank = await redis.zrevrank('leaderboard:$leaderboard', userId);
+    if (rank == null) return [];
+
+    final start = (rank - count).clamp(0, double.infinity).toInt();
+    final end = (rank + count).toInt();
+
+    final results = await redis.zrevrangeWithScores(
+      'leaderboard:$leaderboard',
+      start,
+      end,
+    );
+
+    return results.asMap().entries.map((entry) {
+      final index = entry.key;
+      final (userId, score) = entry.value;
+      return LeaderboardEntry(
+        rank: start + index + 1,
+        userId: userId,
+        score: score,
+      );
+    }).toList();
+  }
+}
+```
+
+## Hash Operations
+
+### User Sessions
+
+```dart
+// lib/src/services/session_storage.dart
+class SessionStorage {
+  final CloudRedisClient redis;
+
+  SessionStorage(this.redis);
+
+  /// Store session data
+  Future<void> storeSession(String sessionId, Map<String, String> data) async {
+    await redis.hmset('session:$sessionId', data);
+
+    // Set expiration (24 hours)
+    await redis.expire('session:$sessionId', Duration(hours: 24));
+  }
+
+  /// Get session data
+  Future<Map<String, String>> getSession(String sessionId) async {
+    return await redis.hgetall('session:$sessionId');
+  }
+
+  /// Get specific session field
+  Future<String?> getSessionField(
+    String sessionId,
+    String field,
+  ) async {
+    return await redis.hget('session:$sessionId', field);
+  }
+
+  /// Update session field
+  Future<void> updateSessionField(
+    String sessionId,
+    String field,
+    String value,
+  ) async {
+    await redis.hset('session:$sessionId', field, value);
+  }
+
+  /// Delete session
+  Future<void> deleteSession(String sessionId) async {
+    await redis.delete('session:$sessionId');
+  }
+
+  /// Refresh session expiration
+  Future<void> refreshSession(String sessionId) async {
+    await redis.expire('session:$sessionId', Duration(hours: 24));
+  }
+}
+```
+
+## Rate Limiting
+
+### Token Bucket Algorithm
+
+```dart
+// lib/src/services/rate_limiter.dart
+class RateLimiter {
+  final CloudRedisClient redis;
+
+  RateLimiter(this.redis);
+
+  /// Check if request is allowed
+  Future<bool> isAllowed(
+    String identifier,
+    int maxRequests,
+    Duration window,
+  ) async {
+    final key = 'ratelimit:$identifier';
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final windowStart = now - window.inMilliseconds;
+
+    // Use transaction
+    final transaction = redis.multi();
+
+    // Remove old entries
+    transaction.zremrangebyscore('key', 0, windowStart);
+
+    // Count current requests
+    transaction.zcard(key);
+
+    // Add current request
+    transaction.zadd(key, now, now.toString());
+
+    // Set expiration
+    transaction.expire(key, window);
+
+    // Execute transaction
+    final results = await transaction.exec();
+
+    final count = results[1] as int;
+    return count < maxRequests;
+  }
+
+  /// Get remaining requests
+  Future<int> getRemaining(
+    String identifier,
+    int maxRequests,
+    Duration window,
+  ) async {
+    final key = 'ratelimit:$identifier';
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final windowStart = now - window.inMilliseconds;
+
+    // Remove old entries and count
+    await redis.zremrangebyscore(key, 0, windowStart);
+    final count = await redis.zcard(key);
+
+    return maxRequests - count;
+  }
+}
+```
+
+### API Rate Limiting
+
+```dart
+// lib/src/middleware/rate_limit_middleware.dart
+class RateLimitMiddleware {
+  final RateLimiter limiter;
+
+  RateLimitMiddleware(this.limiter);
+
+  Future<bool> checkRateLimit(
+    Session session,
+    String identifier, {
+    int maxRequests = 100,
+    Duration window = const Duration(minutes: 1),
+  }) async {
+    final allowed = await limiter.isAllowed(
+      identifier,
+      maxRequests,
+      window,
+    );
+
+    if (!allowed) {
+      throw RateLimitException(
+        'Rate limit exceeded. Try again later.',
+      );
+    }
+
+    return true;
+  }
+}
+
+// Usage in endpoint
+class ApiEndpoint extends Endpoint {
+  final RateLimitMiddleware rateLimit;
+
+  ApiEndpoint(this.rateLimit);
+
+  Future<Response> getData(Session session) async {
+    // Rate limit by user ID
+    final userId = await session.requireUserId();
+    await rateLimit.checkRateLimit(
+      session,
+      'user:$userId',
+      maxRequests: 60,
+      window: Duration(minutes: 1),
+    );
+
+    // Process request
+    return await fetchData(session);
+  }
+}
+```
+
+## Pub/Sub Messaging
+
+### Publishing Messages
+
+```dart
+// lib/src/services/pub_sub_service.dart
+class PubSubService {
+  final CloudRedisClient redis;
+
+  PubSubService(this.redis);
+
+  /// Publish message to channel
+  Future<int> publish(String channel, Map<String, dynamic> message) async {
+    final json = jsonEncode(message);
+    return await redis.publish(channel, json);
+  }
+
+  /// Subscribe to channels
+  Stream<Map<String, dynamic>> subscribe(List<String> channels) {
+    final controller = StreamController<Map<String, dynamic>>();
+
+    final subscription = redis.subscribe(channels);
+
+    subscription.addListener((message) {
+      final json = jsonDecode(message as String) as Map<String, dynamic>;
+      controller.add(json);
+    });
+
+    return controller.stream;
+  }
+}
+```
+
+### Real-time Notifications
+
+```dart
+// lib/src/services/notification_service.dart
+class NotificationService {
+  final PubSubService pubSub;
+
+  NotificationService(this.pubSub);
+
+  /// Send notification to user
+  Future<void> sendNotification(int userId, Notification notification) async {
+    await pubSub.publish(
+      'user:$userId:notifications',
+      notification.toJson(),
+    );
+  }
+
+  /// Broadcast to all users
+  Future<void> broadcast(Notification notification) async {
+    await pubSub.publish(
+      'broadcast:notifications',
+      notification.toJson(),
+    );
+  }
+
+  /// Send to specific role
+  Future<void> sendToRole(String role, Notification notification) async {
+    await pubSub.publish(
+      'role:$role:notifications',
+      notification.toJson(),
+    );
+  }
+}
+```
+
+## Cache Invalidation
+
+### Tag-Based Cache Invalidation
+
+```dart
+// lib/src/services/cache_tag_service.dart
+class CacheTagService {
+  final CloudRedisClient redis;
+
+  CacheTagService(this.redis);
+
+  /// Cache data with tags
+  Future<void> setWithTags(
+    String key,
+    String value,
+    List<String> tags, {
+    Duration? ttl,
+  }) async {
+    // Set the value
+    if (ttl != null) {
+      await redis.setWithExpiration(key, value, ttl);
+    } else {
+      await redis.set(key, value);
+    }
+
+    // Add key to each tag
+    for (final tag in tags) {
+      await redis.sadd('cache:tag:$tag', key);
+    }
+  }
+
+  /// Invalidate cache by tag
+  Future<void> invalidateByTag(String tag) async {
+    final keys = await redis.smembers('cache:tag:$tag');
+
+    // Delete all keys with this tag
+    if (keys.isNotEmpty) {
+      await redis.delete(keys);
+    }
+
+    // Clear tag set
+    await redis.delete('cache:tag:$tag');
+  }
+
+  /// Invalidate multiple tags
+  Future<void> invalidateByTags(List<String> tags) async {
+    for (final tag in tags) {
+      await invalidateByTag(tag);
+    }
+  }
+}
+```
+
+## Performance Optimization
+
+### Multi-Get for Batching
+
+```dart
+// lib/src/services/cache_batch_service.dart
+class CacheBatchService {
+  final CloudRedisClient redis;
+
+  CacheBatchService(this.redis);
+
+  /// Batch get multiple keys
+  Future<Map<String, String>> getMultiple(List<String> keys) async {
+    if (keys.isEmpty) return {};
+
+    final values = await redis.mget(keys);
+
+    final result = <String, String>{};
+    for (var i = 0; i < keys.length; i++) {
+      final value = values[i];
+      if (value != null) {
+        result[keys[i]] = value;
+      }
+    }
+
+    return result;
+  }
+
+  /// Batch set multiple keys
+  Future<void> setMultiple(
+    Map<String, String> values, {
+    Duration? ttl,
+  }) async {
+    if (values.isEmpty) return;
+
+    await redis.mset(values);
+
+    // Set expiration if needed
+    if (ttl != null) {
+      for (final key in values.keys) {
+        await redis.expire(key, ttl);
+      }
+    }
+  }
+}
+```
+
+### Pipeline Operations
+
+```dart
+// lib/src/services/cache_pipeline.dart
+class CachePipeline {
+  final CloudRedisClient redis;
+
+  CachePipeline(this.redis);
+
+  /// Execute multiple commands in pipeline
+  Future<void> executeBatch(List<CacheOperation> operations) async {
+    final pipeline = redis.pipeline();
+
+    for (final op in operations) {
+      switch (op.type) {
+        case CacheOperationType.set:
+          pipeline.set(op.key!, op.value!);
+          break;
+        case CacheOperationType.delete:
+          pipeline.delete(op.key!);
+          break;
+        case CacheOperationType.expire:
+          pipeline.expire(op.key!, op.ttl!);
+          break;
+      }
+    }
+
+    await pipeline.exec();
+  }
+}
+```
+
+## Monitoring and Debugging
+
+### Redis Health Check
+
+```dart
+// lib/src/services/redis_health.dart
+class RedisHealthService {
+  final CloudRedisClient redis;
+
+  RedisHealthService(this.redis);
+
+  /// Check Redis health
+  Future<RedisHealthStatus> checkHealth() async {
+    try {
+      // Ping
+      final start = DateTime.now();
+      await redis.ping();
+      final latency = DateTime.now().difference(start);
+
+      // Get info
+      final info = await redis.info();
+
+      return RedisHealthStatus(
+        healthy: true,
+        latency: latency,
+        memoryUsed: info['used_memory_human'] as String?,
+        connectedClients: info['connected_clients'] as int?,
+      );
+    } catch (e) {
+      return RedisHealthStatus(
+        healthy: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Get cache statistics
+  Future<CacheStats> getStats() async {
+    final info = await redis.info();
+
+    return CacheStats(
+      keys: info['db0']?['keys'] as int? ?? 0,
+      hits: info['keyspace_hits'] as int? ?? 0,
+      misses: info['keyspace_misses'] as int? ?? 0,
+      hitRate: _calculateHitRate(info),
+    );
+  }
+
+  double _calculateHitRate(Map<String, dynamic> info) {
+    final hits = info['keyspace_hits'] as int? ?? 0;
+    final misses = info['keyspace_misses'] as int? ?? 0;
+    final total = hits + misses;
+
+    return total > 0 ? hits / total : 0.0;
+  }
+}
+```
+
+## Best Practices
+
+### 1. Use Appropriate TTL
+
+```dart
+// Good: Short TTL for frequently changing data
+await redis.setWithExpiration(key, value, Duration(minutes: 5));
+
+// Good: Long TTL for rarely changing data
+await redis.setWithExpiration(key, value, Duration(hours: 24));
+
+// Bad: No TTL for cache data
+await redis.set(key, value); // May cause memory issues
+```
+
+### 2. Use Connection Pooling
+
+```dart
+// ServerPod handles connection pooling automatically
+// Don't create new connections for each operation
+```
+
+### 3. Handle Connection Failures
+
+```dart
+Future<String?> safeGet(String key) async {
+  try {
+    return await redis.get(key);
+  } catch (e) {
+    // Fallback to database
+    session.log('Redis error: $e');
+    return null;
+  }
+}
+```
+
+### 4. Use Descriptive Keys
+
+```dart
+// Good: Namespaced and descriptive
+'user:123:profile'
+'product:456:details'
+'cache:api:users:page:2'
+
+// Bad: Generic and unclear
+'user123'
+'product456'
+'users2'
+```
+
+### 5. Compress Large Values
+
+```dart
+import 'dart:convert';
+
+Future<void> setCompressed(String key, String value) async {
+  final compressed = gzip.encode(utf8.encode(value));
+  await redis.set(key, base64Encode(compressed));
+}
+```
+
+## Testing with Redis
+
+### Test Helper
+
+```dart
+// test/helpers/test_redis.dart
+class TestRedisHelper {
+  static Future<void> cleanupKeys(
+    CloudRedisClient redis,
+    String pattern,
+  ) async {
+    final keys = await redis.keys(pattern);
+    if (keys.isNotEmpty) {
+      await redis.delete(keys);
+    }
+  }
+
+  static Future<void> flushAll(CloudRedisClient redis) async {
+    await redis.flushdb();
+  }
+}
+
+// Test example
+void main() {
+  test('should cache user', () async {
+    final redis = createTestRedisClient();
+    final service = UserCacheService(redis);
+
+    await service.cacheUser(testUser);
+    final cached = await service.getUser(testUser.id);
+
+    expect(cached, equals(testUser));
+
+    await TestRedisHelper.cleanupKeys(redis, 'user:*');
+  });
+}
+```
+
+## Quick Reference
+
+```dart
+// Basic operations
+await redis.set('key', 'value');
+await redis.get('key');
+await redis.delete('key');
+
+// With expiration
+await redis.setWithExpiration('key', 'value', Duration(minutes: 5));
+
+// JSON
+await redis.set('user:1', jsonEncode(user));
+final json = await redis.get('user:1');
+
+// Lists
+await redis.lpush('queue', 'item');
+await redis.rpop('queue');
+
+// Sets
+await redis.sadd('tags', 'tag1');
+await redis.smembers('tags');
+
+// Sorted sets
+await redis.zadd('leaderboard', 100.0, 'user1');
+await redis.zrevrange('leaderboard', 0, 9);
+
+// Hashes
+await redis.hset('session:1', 'key', 'value');
+await redis.hgetall('session:1');
+
+// Pub/Sub
+await redis.publish('channel', 'message');
+final sub = redis.subscribe(['channel']);
+```
+
+## Related Skills
+
+- **core**: ServerPod fundamentals
+- **endpoints**: Caching endpoint responses
+- **authentication**: Session storage
+- **testing**: Testing with Redis

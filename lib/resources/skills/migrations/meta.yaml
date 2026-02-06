@@ -1,0 +1,9 @@
+name: migrations
+description: Database migration management for ServerPod - creating, running, and versioning database schema changes
+version: 1.0.0
+tags:
+  - serverpod
+  - database
+  - migrations
+  - postgresql
+  - schema

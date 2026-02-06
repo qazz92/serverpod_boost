@@ -5,6 +5,7 @@
 library serverpod_boost.commands.install_command;
 
 import 'dart:io';
+import 'package:package_config/package_config.dart';
 import 'package:path/path.dart' as p;
 import 'package:serverpod_boost/cli/command.dart';
 import 'package:serverpod_boost/cli/console_helper.dart';
@@ -462,110 +463,53 @@ class InstallCommand extends Command {
   }
 
   /// Find the Boost package skills directory
-  /// Uses the package's own .ai/skills directory
+  /// Supports both local development and published packages
   Future<String> _findBoostSkillsPath() async {
-    // Strategy 1: Try to navigate from executable (for activated packages)
+    // Strategy 1: Try local development (for when working on boost itself)
     try {
       final currentScript = File.fromUri(Platform.script);
       final boostPackageRoot = currentScript.parent.parent.path;
-      final skillsPath = '$boostPackageRoot/.ai/skills/serverpod';
-      if (await Directory(skillsPath).exists()) {
-        ConsoleHelper.indent('Found Boost skills via executable path');
-        return skillsPath;
+      final localPath = '$boostPackageRoot/.ai/skills/serverpod';
+      if (await Directory(localPath).exists()) {
+        ConsoleHelper.indent('Found Boost skills via local development path');
+        return localPath;
       }
     } catch (e) {
-      ConsoleHelper.indent('Failed to resolve via executable path: $e');
+      // Ignore and try next strategy
     }
 
-    // Strategy 2: Try to resolve from pubspec.lock (for local path dependencies)
-    final pubspecLockPath = '${_project!.serverPath}/pubspec.lock';
-    final pubspecLockFile = File(pubspecLockPath);
-
-    if (await pubspecLockFile.exists()) {
-      try {
-        final lockContent = await pubspecLockFile.readAsString();
-        final boostPath = _parsePubspecLockForBoostPath(lockContent, _project!.serverPath ?? _project!.rootPath);
-        if (boostPath != null) {
-          final skillsPath = '$boostPath/.ai/skills/serverpod';
-          if (await Directory(skillsPath).exists()) {
-            ConsoleHelper.indent('Found Boost skills via pubspec.lock');
-            return skillsPath;
+    // Strategy 2: Use package resolver to find lib/resources/skills
+    try {
+      final packageConfig = await findPackageConfig(Directory.current);
+      if (packageConfig != null) {
+        final boostPackage = packageConfig['serverpod_boost'];
+        if (boostPackage != null) {
+          final packageRoot = boostPackage.root.path;
+          final resourcesPath = '$packageRoot/lib/resources/skills';
+          if (await Directory(resourcesPath).exists()) {
+            ConsoleHelper.indent('Found Boost skills via package config');
+            return resourcesPath;
           }
         }
-      } catch (e) {
-        // Ignore parsing errors
       }
+    } catch (e) {
+      // Ignore and try next strategy
     }
 
-    // Strategy 3: Return default path (will be checked later)
-    ConsoleHelper.indent('Using default path');
-    final currentScript = File.fromUri(Platform.script);
-    final boostPackageRoot = currentScript.parent.parent.path;
-    return '$boostPackageRoot/.ai/skills/serverpod';
-  }
-
-  /// Parse pubspec.lock to find the serverpod_boost package path
-  /// Returns the absolute path to the boost package, or null if not found
-  String? _parsePubspecLockForBoostPath(String lockContent, String projectRoot) {
-    final lines = lockContent.split('\n');
-
-    String? source;
-    String? relativePath;
-    bool inBoostPackage = false;
-
-    for (var i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      final trimmedLine = line.trim();
-
-      if (trimmedLine.isEmpty) continue;
-
-      // Detect package start (e.g., "  serverpod_boost:")
-      if (trimmedLine == 'serverpod_boost:') {
-        inBoostPackage = true;
-        continue;
-      }
-
-      // Exit package section when we hit another top-level package
-      // Top-level packages are indented with exactly 2 spaces in the original line
-      if (inBoostPackage) {
-        // Check if this line starts with exactly 2 spaces followed by a word and colon
-        // This is the format for top-level packages in pubspec.lock
-        final isNextPackage = RegExp(r'^  [a-z_][a-z0-9_]+:').hasMatch(line);
-        if (isNextPackage && trimmedLine != 'serverpod_boost:') {
-          break;
-        }
-      }
-
-      if (!inBoostPackage) continue;
-
-      // Parse source
-      if (trimmedLine.startsWith('source:')) {
-        source = trimmedLine.split(':')[1].trim();
-        continue;
-      }
-
-      // Parse relative path (look for "path:" in description section)
-      if (trimmedLine.startsWith('path:')) {
-        // Remove quotes and trim
-        relativePath = trimmedLine.substring(5).trim().replaceAll('"', '').replaceAll("'", '');
-        continue;
-      }
+    // Strategy 3: Try resolving from current package (for published packages)
+    try {
+      // For published packages, lib is at the package root
+      final currentScript = File.fromUri(Platform.script);
+      final binDir = currentScript.parent;
+      final packageRoot = binDir.parent;
+      final resourcesPath = '$packageRoot/lib/resources/skills';
+      ConsoleHelper.indent('Using resolved package path');
+      return resourcesPath;
+    } catch (e) {
+      // Fallback to default
+      ConsoleHelper.indent('Using default path');
+      return 'lib/resources/skills';
     }
-
-    // After parsing all lines, check if we found a path dependency
-    if (source == 'path' && relativePath != null) {
-      // Resolve relative path from project root
-      final joinedPath = p.join(projectRoot, relativePath);
-      final normalizedPath = p.normalize(joinedPath);
-
-      // Check if the normalized path exists
-      final boostDir = Directory(normalizedPath);
-      if (boostDir.existsSync()) {
-        return boostDir.absolute.path;
-      }
-    }
-
-    return null;
   }
 
   /// Copy directory recursively

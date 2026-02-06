@@ -1,0 +1,9 @@
+name: authentication
+description: User authentication with ServerPod - implementing login, registration, session management, and authorization
+version: 1.0.0
+tags:
+  - serverpod
+  - authentication
+  - authorization
+  - sessions
+  - security

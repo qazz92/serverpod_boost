@@ -1,0 +1,167 @@
+# ServerPod Core Development
+
+You are working with a ServerPod {{serverpod_version}} project called **{{project_name}}**.
+
+## Project Structure
+
+ServerPod projects use a 3-package monorepo structure:
+
+- **Server code:** `{{project_name}}_server/lib/src/`
+- **Client code:** `{{project_name}}_client/lib/`
+- **Flutter app** (optional): `{{project_name}}_flutter/lib/`
+
+### Key Directories
+
+- **Protocol:** `{{project_name}}_server/lib/src/protocol/` - Type definitions
+- **Endpoints:** `{{project_name}}_server/lib/src/endpoints/` - API methods
+- **Models:** `{{project_name}}_server/lib/src/models/` - Data models
+- **Migrations:** `{{project_name}}_server/migrations/` - Database migrations
+- **Config:** `{{project_name}}_server/config/` - Configuration files
+
+## Development Workflow
+
+### 1. Creating Endpoints
+
+{{#has_endpoints}}
+This project has **{{endpoint_count}} existing endpoints**. Follow their patterns when adding new ones.
+
+{{#endpoints}}
+- `{{name}}` - {{file}}
+{{/endpoints}}
+{{/has_endpoints}}
+
+{{^has_endpoints}}
+This project doesn't have any endpoints yet. Create your first endpoint:
+
+```dart
+// {{project_name}}_server/lib/src/endpoints/greeting_endpoint.dart
+import 'package:serverpod/serverpod.dart';
+
+class GreetingEndpoint extends Endpoint {
+  Future<String> hello(Session session, String name) async {
+    return 'Hello, $name!';
+  }
+}
+```
+{{/has_endpoints}}
+
+### 2. Protocol Generation
+
+After modifying endpoints or models, always run:
+
+```bash
+serverpod generate
+```
+
+This regenerates the protocol and client code.
+
+### 3. Database Changes
+
+{{#uses_postgres}}
+This project uses **PostgreSQL**.
+{{/uses_postgres}}
+
+{{#uses_sqlite}}
+This project uses **SQLite** (development only).
+{{/uses_sqlite}}
+
+For database changes:
+
+1. Create migration: `serverpod create migration YourMigration`
+2. Define schema in `migrations/`
+3. Run migration: `serverpod migrate`
+
+{{#has_migrations}}
+This project has **{{migration_count}} migrations**.
+{{/has_migrations}}
+
+## Common Patterns
+
+### Session Management
+
+Always use the `Session` object for database access and authentication:
+
+```dart
+Future<UserData> getUser(Session session, String userId) async {
+  final userIdInt = int.tryParse(userId);
+  if (userIdInt == null) {
+    throw InvalidInputException('Invalid user ID');
+  }
+  return await User.findById(session, userIdInt);
+}
+```
+
+### Error Handling
+
+Use descriptive exceptions:
+
+```dart
+Future<User> findUser(Session session, int userId) async {
+  final user = await User.findById(session, userId);
+
+  if (user == null) {
+    throw InvalidInputException('User not found: $userId');
+  }
+
+  return user;
+}
+```
+
+### Database Transactions
+
+Use transactions for multi-step operations:
+
+```dart
+Future<void> transferMoney(
+  Session session,
+  int fromId,
+  int toId,
+  double amount,
+) async {
+  await session.db.transaction(() async {
+    final from = await User.findById(session, fromId);
+    final to = await User.findById(session, toId);
+
+    if (from!.balance < amount) {
+      throw InsufficientFundsException();
+    }
+
+    from.balance -= amount;
+    to!.balance += amount;
+
+    await from.update(session);
+    await to.update(session);
+  });
+}
+```
+
+## Best Practices
+
+1. **Always use typed parameters** - Avoid `dynamic` in endpoint methods
+2. **Use descriptive names** - Endpoints and methods should be self-documenting
+3. **Validate inputs** - Check parameters before using them
+4. **Handle errors gracefully** - Return meaningful error messages
+5. **Use transactions** - For multi-step database operations
+6. **Generate protocol** - After any protocol changes
+7. **Test your endpoints** - Write tests for business logic
+
+## Quick Reference
+
+```bash
+# Start development server
+serverpod run
+
+# Generate protocol and client code
+serverpod generate
+
+# Create and run migrations
+serverpod create migration AddUsersTable
+serverpod migrate
+
+# Run tests
+dart test
+```
+
+---
+
+For more detailed information about endpoints, models, or migrations, see the respective skills.

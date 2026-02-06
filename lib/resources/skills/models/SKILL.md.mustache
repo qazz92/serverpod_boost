@@ -1,0 +1,458 @@
+# ServerPod Models
+
+{{#has_models}}
+## Existing Models
+
+This project has **{{model_count}} model(s)**:
+
+{{#models}}
+- **{{class_name}}** - {{namespace}}
+{{/models}}
+
+---
+
+## Adding New Models
+
+{{/has_models}}
+{{^has_models}}
+## Creating Models
+
+This project doesn't have custom models yet. Here's how to create them:
+
+---
+
+{{/has_models}}
+
+### Model Definition
+
+Define models in `{{project_name}}_server/lib/src/models/`:
+
+```dart
+// {{project_name}}_server/lib/src/models/user.dart
+import 'package:serverpod/serverpod.dart';
+
+class User extends Model {
+  @Field()
+  int? id;
+
+  @Field()
+  String email;
+
+  @Field()
+  String passwordHash;
+
+  @Field(defaultValue: DateTime.now)
+  DateTime createdAt;
+
+  @Field(includeIfNull: false)
+  DateTime? lastLoginAt;
+
+  @Field(includeIfNull: false)
+  String? name;
+
+  @Field(defaultValue: false)
+  bool isActive;
+
+  @Field(includeIfNull: false)
+  int? failedLoginAttempts;
+
+  // Computed properties (not persisted)
+  bool get isLockedOut =>
+      failedLoginAttempts != null && failedLoginAttempts! >= 5;
+}
+```
+
+### Field Annotations
+
+Use `@Field()` annotations to define serializable fields:
+
+```dart
+class Product extends Model {
+  @Field()
+  int? id;                    // Auto-increment primary key
+
+  @Field()
+  String name;                // Required text field
+
+  @Field()
+  double price;               // Double/number field
+
+  @Field(defaultValue: 0)
+  int stockQuantity = 0;      // With default value
+
+  @Field(includeIfNull: false)
+  String? description;        // Optional field (not sent if null)
+
+  @Field(defaultValue: false)
+  bool isAvailable = false;   // Boolean with default
+
+  @Field()
+  DateTime createdAt;         // DateTime field
+
+  @Field(includeIfNull: false)
+  DateTime? updatedAt;        // Optional DateTime
+}
+```
+
+### Complex Types
+
+```dart
+class Order extends Model {
+  @Field()
+  int? id;
+
+  @Field()
+  int userId;  // Foreign key (manual)
+
+  @Field()
+  List<String> items;  // String list
+
+  @Field()
+  Map<String, dynamic> metadata;  // JSON data
+
+  @Field()
+  OrderStatus status;  // Enum (must be serializable)
+}
+
+enum OrderStatus {
+  pending,
+  processing,
+  shipped,
+  delivered,
+  cancelled,
+}
+```
+
+## Database Queries
+
+### Finding Records
+
+```dart
+// By ID
+final user = await User.findById(session, userId);
+
+if (user == null) {
+  throw InvalidInputException('User not found');
+}
+
+// With simple query
+final users = await User.find(
+  session,
+  where: (u) => u.email.equals('user@example.com'),
+);
+
+// With multiple conditions
+final activeUsers = await User.find(
+  session,
+  where: (u) => u.isActive.equals(true) &
+              u.createdAt.isLessThan(DateTime.now()),
+);
+
+// With ordering
+final recentUsers = await User.find(
+  session,
+  orderBy: User.createdAt,
+  orderDescending: true,
+  limit: 10,
+);
+
+// With offset/limit for pagination
+final page = await User.find(
+  session,
+  limit: 20,
+  offset: 40,  // Skip first 40, get next 20
+);
+```
+
+### Query Operators
+
+```dart
+// Equals
+where: (u) => u.email.equals('test@example.com')
+
+// Not equals
+where: (u) => u.status.notEquals(OrderStatus.cancelled)
+
+// Comparison
+where: (u) => u.price.isGreaterThan(100)
+where: (u) => u.price.isLessThan(500)
+where: (u) => u.price.isGreaterOrEqualTo(100)
+
+// Like/contains
+where: (u) => u.name.like('%john%')
+
+// In list
+where: (u) => u.status.inList([OrderStatus.pending, OrderStatus.processing])
+
+// Null checks
+where: (u) => u.deletedAt.isNull()
+where: (u) => u.deletedAt.isNotNull()
+
+// Date ranges
+where: (u) => u.createdAt.isBetween(
+  DateTime(2024, 1, 1),
+  DateTime(2024, 12, 31),
+)
+
+// Combining conditions
+where: (u) => u.isActive.equals(true) & u.createdAt.isLessThan(DateTime.now())
+where: (u) => u.status.equals(OrderStatus.cancelled) | u.refundedAt.isNotNull()
+```
+
+### Creating Records
+
+```dart
+// Simple insert
+final user = User(
+  email: 'user@example.com',
+  passwordHash: hashedPassword,
+  createdAt: DateTime.now(),
+);
+
+await user.insert(session);
+
+print('Created user with ID: ${user.id}');  // ID is auto-assigned
+```
+
+### Updating Records
+
+```dart
+// Fetch and update
+final user = await User.findById(session, userId);
+if (user != null) {
+  user.name = 'New Name';
+  user.lastLoginAt = DateTime.now();
+  await user.update(session);
+}
+
+// Bulk update (custom query)
+await session.db.update(
+  table: 'user',
+  rows: [
+    {'name': 'Updated Name', 'last_login_at': DateTime.now().toIso8601String()}
+  ],
+  where: (t) => t.id.equals(userId),
+);
+```
+
+### Deleting Records
+
+```dart
+// Fetch and delete
+final user = await User.findById(session, userId);
+if (user != null) {
+  await user.delete(session);
+}
+
+// Bulk delete
+await User.delete(
+  session,
+  where: (u) => u.isActive.equals(false),
+);
+```
+
+## Relationships
+
+ServerPod doesn't have built-in ORM relationships like Laravel's Eloquent.
+Use foreign keys and manual queries:
+
+### One-to-Many (User has many Posts)
+
+```dart
+class User extends Model {
+  @Field()
+  int? id;
+
+  @Field()
+  String email;
+}
+
+class Post extends Model {
+  @Field()
+  int? id;
+
+  @Field()
+  int userId;  // Foreign key
+
+  @Field()
+  String content;
+
+  // Helper method
+  Future<User?> getUser(Session session) async {
+    return await User.findById(session, userId);
+  }
+}
+
+// Query posts for a user
+final userPosts = await Post.find(
+  session,
+  where: (p) => p.userId.equals(userId),
+);
+```
+
+### Many-to-Many (Users and Groups)
+
+```dart
+class User extends Model {
+  @Field()
+  int? id;
+
+  @Field()
+  String email;
+}
+
+class Group extends Model {
+  @Field()
+  int? id;
+
+  @Field()
+  String name;
+}
+
+class UserGroup extends Model {
+  @Field()
+  int userId;
+
+  @Field()
+  int groupId;
+
+  // Helper methods
+  Future<List<Group>> getGroups(Session session) async {
+    final userGroups = await UserGroup.find(
+      session,
+      where: (ug) => ug.userId.equals(userId),
+    );
+
+    final groupIds = userGroups.map((ug) => ug.groupId).toList();
+
+    return await Group.find(
+      session,
+      where: (g) => g.id.inList(groupIds),
+    );
+  }
+}
+```
+
+## Counting and Aggregation
+
+```dart
+// Count all
+final userCount = await User.count(session);
+
+// Count with condition
+final activeCount = await User.count(
+  session,
+  where: (u) => u.isActive.equals(true),
+);
+
+// Check existence
+final hasActiveUsers = await User.exists(
+  session,
+  where: (u) => u.isActive.equals(true),
+);
+```
+
+## Best Practices
+
+### 1. Use Type-Safe Models
+
+```dart
+// ✓ Good - typed model
+Future<User?> getUser(Session session, int userId) async {
+  return await User.findById(session, userId);
+}
+
+// ✗ Bad - manual query
+Future<Map<String, dynamic>?> getUser(Session session, int userId) async {
+  return await session.db.query('SELECT * FROM user WHERE id = $userId');
+}
+```
+
+### 2. Validate Before Save
+
+```dart
+Future<void> createUser(Session session, String email, String password) async {
+  // Validate email
+  if (!email.contains('@')) {
+    throw InvalidInputException('Invalid email');
+  }
+
+  // Check duplicates
+  final existing = await User.find(
+    session,
+    where: (u) => u.email.equals(email),
+  );
+
+  if (existing.isNotEmpty) {
+    throw InvalidInputException('Email already exists');
+  }
+
+  // Create user
+  final user = User(email: email, passwordHash: hashPassword(password));
+  await user.insert(session);
+}
+```
+
+### 3. Use Transactions for Multi-Step Operations
+
+```dart
+Future<void> transferMoney(
+  Session session,
+  int fromId,
+  int toId,
+  double amount,
+) async {
+  await session.db.transaction(() async {
+    final from = await User.findById(session, fromId);
+    final to = await User.findById(session, toId);
+
+    if (from == null || to == null) {
+      throw InvalidInputException('User not found');
+    }
+
+    if (from.balance < amount) {
+      throw InvalidInputException('Insufficient funds');
+    }
+
+    from.balance -= amount;
+    to.balance += amount;
+
+    await from.update(session);
+    await to.update(session);
+  });
+}
+```
+
+### 4. Include Only Necessary Fields
+
+```dart
+class User extends Model {
+  @Field()
+  String email;
+
+  @Field()
+  String passwordHash;  // Never send to client!
+
+  @Field(includeIfNull: false)
+  String? name;
+
+  // Create a data class for client responses
+  UserData toData() {
+    return UserData(
+      id: id,
+      email: email,
+      name: name,
+    );
+  }
+}
+
+// In endpoint
+Future<UserData> getUser(Session session, int userId) async {
+  final user = await User.findById(session, userId);
+  return user!.toData();  // Only send safe fields
+}
+```
+
+---
+
+For information about migrations and database schema, see the **migrations** skill.

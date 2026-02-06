@@ -1,0 +1,9 @@
+name: redis
+description: Redis caching with ServerPod - session storage, caching, pub/sub, and rate limiting
+version: 1.0.0
+tags:
+  - serverpod
+  - redis
+  - caching
+  - sessions
+  - pub-sub

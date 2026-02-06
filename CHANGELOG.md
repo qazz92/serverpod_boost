@@ -5,6 +5,15 @@ All notable changes to ServerPod Boost will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.html).
 
+## [0.1.2] - 2026-02-05
+
+### Fixed
+- **Install Command**: Fixed skills not accessible when package is published to pub.dev
+  - Moved skills from `.ai/skills/` to `lib/resources/skills/` for package accessibility
+  - Updated `_findBoostSkillsPath()` to use `package_config` for path resolution
+  - Skills are now properly bundled and accessible in published packages
+- **Dependencies**: Added `package_config: ^2.1.0` for package path resolution
+
 ## [0.1.1] - 2026-02-05
 
 ### Fixed

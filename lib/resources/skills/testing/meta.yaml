@@ -1,0 +1,9 @@
+name: testing
+description: Testing patterns and best practices for ServerPod - unit tests, integration tests, and endpoint testing
+version: 1.0.0
+tags:
+  - serverpod
+  - testing
+  - unit-tests
+  - integration-tests
+  - tdd

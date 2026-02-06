@@ -2,13 +2,13 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Dart](https://img.shields.io/badge/dart-3.8.0+-blue.svg)](https://dart.dev)
-[![Tests](https://img.shields.io/badge/tests-400%2B-brightgreen.svg)](https://github.com/serverpod/boost)
+[![Tests](https://img.shields.io/badge/tests-400%2B-brightgreen.svg)](https://github.com/qazz92/serverpod_boost)
 
 > AI acceleration for ServerPod development via MCP (Model Context Protocol)
 
 ServerPod Boost is an MCP server that provides AI assistants (like Claude) with deep semantic understanding of ServerPod projects, enabling high-quality code generation through context-aware tool access.
 
-## Version 0.1.0 - Foundation Release
+## Version 0.1.2 - Published Package Fix
 
 This is the first public release of ServerPod Boost, providing the core infrastructure for AI-assisted ServerPod development. The skills system framework is in place, with pre-built skills coming in future releases.
 
@@ -29,13 +29,16 @@ Inspired by [Laravel Boost](https://github.com/joelbutcher/laravel_boost), Serve
 ### 1. Install Boost
 
 ```bash
-# Navigate to your ServerPod project root
-cd your_serverpod_project
+# Navigate to your ServerPod project's server directory
+cd your_project_server
 
 # Add as dev dependency
 dart pub add serverpod_boost --dev
 
 # Install everything (guidelines, skills, MCP config)
+dart run serverpod_boost:install
+
+# Or using the boost command
 dart run serverpod_boost:boost install
 ```
 
@@ -47,15 +50,6 @@ That's it! The installer will:
 - ✓ Generate AGENTS.md and CLAUDE.md documentation
 - ✓ Configure Claude Desktop automatically
 - ✓ Install default skills
-
-### Alternative: Manual Installation
-
-```bash
-cd your_serverpod_project
-mkdir -p .ai/boost
-cd .ai/boost
-dart pub add serverpod_boost --path=/path/to/serverpod_boost
-```
 
 ### 2. Configure Claude Desktop
 
@@ -118,10 +112,14 @@ ServerPod Boost includes the infrastructure for an extensible skills system. The
 ## CLI Commands
 
 ```bash
-boost install                  # Install everything (guidelines, MCP config)
-boost install --interactive    # Interactive installation with options
-boost skill:list               # List available skills
-boost skill:show <name>        # Show skill details
+# Installation
+dart run serverpod_boost:install              # Install (interactive by default)
+dart run serverpod_boost:install --non-interactive  # Silent install
+dart run serverpod_boost:boost install        # Same as above
+
+# Skills
+dart run serverpod_boost:boost skill:list     # List available skills
+dart run serverpod_boost:boost skill:show <name>  # Show skill details
 ```
 
 ## Project Structure
@@ -231,4 +229,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **Made with ❤️ for the ServerPod community**
 
-**Version**: 0.1.0 | **Tests**: 400+ | **Tools**: 20
+**Version**: 0.1.2 | **Tests**: 400+ | **Tools**: 20

@@ -1,0 +1,341 @@
+# ServerPod Migrations
+
+Database migration management for {{project_name}} using ServerPod {{serverpod_version}}.
+
+## Overview
+
+ServerPod provides a built-in migration system for managing database schema changes. This skill covers creating, applying, and managing migrations.
+
+{{#uses_postgres}}
+## PostgreSQL Setup
+
+Your project uses PostgreSQL for database management. Migrations are automatically generated from your protocol definitions.
+
+**Database Configuration:**
+```yaml
+# config/generators.yaml
+database:
+  host: localhost
+  port: 5432
+  name: {{project_name}}
+  user: postgres
+  password: postgres
+```
+{{/uses_postgres}}
+
+## Creating Migrations
+
+### 1. Define Models in Protocol
+
+First, define your data models in `lib/src/protocol/`:
+
+```dart
+// lib/src/protocol/models/my_model.dart
+class MyModel extends SerializableModel {
+  String name;
+  int? count;
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'count': count,
+  };
+
+  @override
+  static MyModel fromJson(Map<String, dynamic> json) => MyModel(
+    name: json['name'],
+    count: json['count'],
+  );
+}
+```
+
+### 2. Generate Migration
+
+```bash
+# Generate migration files from protocol definitions
+serverpod generate
+
+# Create a new migration manually (if needed)
+serverpod create-migration describe_your_changes
+```
+
+### 3. Migration Files Structure
+
+```
+migrations/
+├── migration/
+│   ├── 20240101000000_describe_your_changes.sql
+│   └── 20240101000001_add_users_table.sql
+└── generated/
+    └── serverpod/
+        └── protocol/
+            └── definitions.dart
+```
+
+## Migration SQL Format
+
+Each migration file should include:
+
+```sql
+-- Migration: Add users table
+-- Created: 2024-01-01
+
+-- Up migration
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Down migration
+-- DROP TABLE users;
+```
+
+## Running Migrations
+
+### Apply Migrations
+
+```bash
+# Apply all pending migrations
+serverpod migrate
+
+# Apply specific migration
+serverpod migrate apply 20240101000000_describe_your_changes
+
+# Show migration status
+serverpod migrate status
+```
+
+### Rollback Migrations
+
+```bash
+# Rollback last migration
+serverpod migrate rollback
+
+# Rollback to specific migration
+serverpod migrate rollback 20240101000000
+```
+
+### Reset Database
+
+```bash
+# Reset database (CAUTION: deletes all data)
+serverpod migrate reset
+
+# Drop all tables
+serverpod migrate drop
+```
+
+{{#has_migrations}}
+## Current Migrations Status
+
+Your project has existing migrations. Check the current status:
+
+```bash
+cd {{project_name}}
+serverpod migrate status
+```
+
+**Key existing migrations:**
+{{#existing_migrations}}
+- `{{name}}` - {{description}}
+{{/existing_migrations}}
+{{/has_migrations}}
+
+## Best Practices
+
+### 1. Always Test Migrations
+
+```bash
+# Test on development database first
+serverpod migrate --env development
+
+# Then apply to production
+serverpod migrate --env production
+```
+
+### 2. Write Reversible Migrations
+
+Always include both `up` and `down` migrations:
+
+```sql
+-- Up: Create index
+CREATE INDEX idx_users_email ON users(email);
+
+-- Down: Remove index
+-- DROP INDEX idx_users_email;
+```
+
+### 3. Use Transactions
+
+For complex migrations, wrap in transactions:
+
+```sql
+BEGIN;
+
+-- Your migration changes here
+ALTER TABLE users ADD COLUMN bio TEXT;
+
+COMMIT;
+
+-- Rollback if needed
+-- ROLLBACK;
+```
+
+### 4. Backward Compatibility
+
+Ensure new fields are nullable or have defaults:
+
+```sql
+-- Good: Nullable field
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+
+-- Good: Field with default
+ALTER TABLE users ADD COLUMN status VARCHAR(20) DEFAULT 'active';
+
+-- Avoid: Required field without default (breaks existing data)
+-- ALTER TABLE users ADD COLUMN name VARCHAR(100) NOT NULL;
+```
+
+### 5. Data Migrations
+
+For data migrations, use Dart migration methods:
+
+```dart
+// lib/src/migrations/data_migration.dart
+Future<void> migrateData(Session session) async {
+  final users = await session.db.query('SELECT * FROM users');
+  for (var user in users) {
+    await session.db.execute(
+      'UPDATE users SET new_field = @value WHERE id = @id',
+      parameters: {
+        'value': computeValue(user),
+        'id': user['id'],
+      },
+    );
+  }
+}
+```
+
+## Common Migration Patterns
+
+### Adding Columns
+
+```sql
+-- Add new column
+ALTER TABLE products ADD COLUMN sku VARCHAR(50);
+
+-- Add column with default
+ALTER TABLE products ADD COLUMN price DECIMAL(10,2) DEFAULT 0.00;
+
+-- Add column with foreign key
+ALTER TABLE orders ADD COLUMN user_id INTEGER REFERENCES users(id);
+```
+
+### Creating Indexes
+
+```sql
+-- Single column index
+CREATE INDEX idx_users_email ON users(email);
+
+-- Composite index
+CREATE INDEX idx_orders_user_status ON orders(user_id, status);
+
+-- Unique index
+CREATE UNIQUE INDEX idx_products_sku ON products(sku);
+```
+
+### Renaming Tables/Columns
+
+```sql
+-- Rename table
+ALTER TABLE old_name RENAME TO new_name;
+
+-- Rename column
+ALTER TABLE users RENAME COLUMN old_name TO new_name;
+```
+
+### Modifying Columns
+
+```sql
+-- Change column type
+ALTER TABLE users ALTER COLUMN age TYPE INTEGER USING age::INTEGER;
+
+-- Add constraint
+ALTER TABLE users ADD CONSTRAINT check_age CHECK (age >= 18);
+
+-- Drop constraint
+ALTER TABLE users DROP CONSTRAINT check_age;
+```
+
+## Troubleshooting
+
+### Migration Conflicts
+
+If multiple developers create migrations with the same timestamp:
+
+```bash
+# Rename conflicting migration
+mv migrations/migration/20240101000000_conflict.sql \
+   migrations/migration/20240101000001_conflict.sql
+```
+
+### Failed Migrations
+
+If a migration fails:
+
+1. Check the error message
+2. Fix the SQL in the migration file
+3. Run `serverpod migrate` again (it will skip completed migrations)
+
+### Orphaned Records
+
+When adding foreign keys:
+
+```sql
+-- First clean up orphaned records
+DELETE FROM orders WHERE user_id NOT IN (SELECT id FROM users);
+
+-- Then add foreign key constraint
+ALTER TABLE orders ADD CONSTRAINT fk_orders_user
+  FOREIGN KEY (user_id) REFERENCES users(id);
+```
+
+## Migration Workflow
+
+1. **Modify Protocol**: Update models in `lib/src/protocol/`
+2. **Generate**: Run `serverpod generate`
+3. **Review**: Check generated migration files
+4. **Test**: Apply migrations to development database
+5. **Verify**: Test application with new schema
+6. **Commit**: Include migration files in git
+7. **Deploy**: Apply migrations to production
+
+## Quick Reference
+
+```bash
+# Generate migrations from protocol
+serverpod generate
+
+# Apply migrations
+serverpod migrate
+
+# Check status
+serverpod migrate status
+
+# Rollback
+serverpod migrate rollback
+
+# Reset database
+serverpod migrate reset
+
+# Create manual migration
+serverpod create-migration description
+```
+
+## Related Skills
+
+- **models**: Define database models in protocol
+- **endpoints**: Query models from endpoints
+- **redis**: Caching strategies with migrations

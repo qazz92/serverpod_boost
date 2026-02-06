@@ -1,0 +1,7 @@
+name: models
+description: ServerPod model definition and database query patterns
+version: 1.0.0
+tags:
+  - serverpod
+  - models
+  - database

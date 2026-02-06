@@ -1,0 +1,7 @@
+name: endpoints
+description: ServerPod endpoint development patterns and best practices
+version: 1.0.0
+tags:
+  - serverpod
+  - endpoints
+  - api
