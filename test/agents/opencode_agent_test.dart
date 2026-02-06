@@ -40,10 +40,10 @@ void main() {
         final config = agent.generateMcpConfig(mockProject);
         final server = config['servers']['serverpod-boost'];
 
-        expect(server['command'], equals('dart'));
-        expect(server['args'], contains('run'));
-        expect(server['args'], contains('serverpod_boost:boost'));
-        expect(server['args'], contains('--path=${mockProject.rootPath}'));
+        expect(server['command'], equals('${mockProject.rootPath}/run-boost.sh'));
+        expect(server['args'], isEmpty);
+        expect(server, isNot(contains('cwd')));
+        expect(server, isNot(contains('env')));
       });
     });
 
@@ -60,7 +60,7 @@ void main() {
 
         final content = await configFile.readAsString();
         expect(content, contains('serverpod-boost'));
-        expect(content, contains('dart'));
+        expect(content, contains('run-boost.sh'));
       });
 
       test('merges with existing config', () async {
@@ -76,8 +76,8 @@ void main() {
         final newConfig = {
           'servers': {
             'serverpod-boost': {
-              'command': 'dart',
-              'args': ['run', 'serverpod_boost:boost', '--path=${mockProject.rootPath}'],
+              'command': '${mockProject.rootPath}/run-boost.sh',
+              'args': [],
             }
           }
         };

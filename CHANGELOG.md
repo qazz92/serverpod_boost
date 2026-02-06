@@ -5,6 +5,26 @@ All notable changes to ServerPod Boost will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.html).
 
+## [0.1.5] - 2026-02-06
+
+### Added
+- **Wrapper Script Installation**: Install command now creates `run-boost.sh` wrapper script
+  - Automatically created at project root during installation
+  - Handles directory navigation to server folder automatically
+  - Works reliably with all MCP clients regardless of `cwd` support
+  - Simple project-local setup with no user-specific paths
+
+### Changed
+- **MCP Configuration**: Simplified to use wrapper script approach
+  - `.mcp.json` now references `run-boost.sh` instead of complex configurations
+  - No need for `cwd`, `env`, or `dart pub global run` commands
+  - Works consistently across all platforms and users
+
+### Fixed
+- **MCP Connection**: Fixed connection issues when `.mcp.json` is in project root
+  - Wrapper script ensures boost runs from correct directory
+  - Resolves issues with clients that don't support `cwd` option properly
+
 ## [0.1.4] - 2026-02-06
 
 ### Fixed

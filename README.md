@@ -57,43 +57,24 @@ That's it! The installer will:
 
 ### 2. Configure Claude Desktop
 
-If you didn't use the interactive installer, add this to your project's `.mcp.json`:
+The install command automatically creates a wrapper script `run-boost.sh` in your project. Add this to your Claude Desktop configuration:
 
-**Option A: Using local installation (from server directory)**
 ```json
 {
   "mcpServers": {
     "serverpod-boost": {
-      "command": "dart",
-      "args": [".ai/boost/bin/boost.dart"]
+      "command": "/path/to/your/project/run-boost.sh"
     }
   }
 }
 ```
 
-**Option B: Using global activation (from any directory)**
-```json
-{
-  "mcpServers": {
-    "serverpod-boost": {
-      "command": "/Users/yourname/.pub-cache/bin/boost",
-      "args": ["--path=/path/to/your/project"]
-    }
-  }
-}
-```
+The `run-boost.sh` wrapper script is automatically created by the install command and handles all the complexity for you - no need to worry about global installations or system-specific paths.
 
-**Option C: Using pub global run (from any directory)**
-```json
-{
-  "mcpServers": {
-    "serverpod-boost": {
-      "command": "dart",
-      "args": ["pub", "global", "run", "serverpod_boost:boost", "--path=/path/to/your/project"]
-    }
-  }
-}
-```
+**Configuration file locations:**
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
 See [examples/](examples/) directory for complete configuration samples.
 

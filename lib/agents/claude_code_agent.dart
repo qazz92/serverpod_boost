@@ -37,12 +37,8 @@ class ClaudeCodeAgent extends Agent {
     return {
       'mcpServers': {
         'serverpod-boost': {
-          'command': _findDartExecutable(),
-          'args': [
-            'run',
-            'serverpod_boost:boost',
-            '--path=${project.rootPath}',
-          ],
+          'command': '${project.rootPath}/run-boost.sh',
+          'args': [],
         },
       },
     };
@@ -85,12 +81,4 @@ class ClaudeCodeAgent extends Agent {
 
   @override
   List<String> get supportedFileTypes => ['.dart', '.yaml'];
-
-  /// Find the Dart executable path
-  ///
-  /// In most cases, 'dart' in PATH will work. This could be enhanced
-  /// to find the full path if needed.
-  String _findDartExecutable() {
-    return 'dart';
-  }
 }

@@ -354,6 +354,12 @@ class InstallCommand extends Command {
       ConsoleHelper.closeSection();
     }
 
+    // Install boost executable
+    ConsoleHelper.subHeader('Installing Boost Executable');
+    final result = await _installBoostExecutable();
+    results['boost'] = result;
+    ConsoleHelper.closeSection();
+
     // Display final summary
     _displaySummary(results);
   }
@@ -639,6 +645,135 @@ class InstallCommand extends Command {
       }
     } catch (e) {
       return InstallResult.failure({'mcp': e.toString()});
+    }
+  }
+
+  /// Install boost executable
+  Future<InstallResult> _installBoostExecutable() async {
+    try {
+      ConsoleHelper.info('Installing boost executable...');
+
+      // Find the Boost package root
+      final boostPackageRoot = await _findBoostPackageRoot();
+      final sourceExecutablePath = '$boostPackageRoot/bin/boost.dart';
+      final targetDirPath = '${_project!.rootPath}/.ai/boost/bin';
+      final targetExecutablePath = '$targetDirPath/boost.dart';
+
+      ConsoleHelper.indent('Source: $sourceExecutablePath');
+      ConsoleHelper.indent('Target: $targetExecutablePath');
+
+      // Check if source executable exists
+      final sourceFile = File(sourceExecutablePath);
+      if (!await sourceFile.exists()) {
+        ConsoleHelper.warning('Boost executable not found at: $sourceExecutablePath');
+        return InstallResult.failure({'boost executable': 'Source file not found'});
+      }
+
+      // Create target directory if it doesn't exist
+      final targetDir = Directory(targetDirPath);
+      if (!await targetDir.exists()) {
+        await targetDir.create(recursive: true);
+        ConsoleHelper.indent('Created directory: $targetDirPath');
+      }
+
+      // Check if target file exists
+      final targetFile = File(targetExecutablePath);
+      if (await targetFile.exists()) {
+        if (_config.overwrite) {
+          await targetFile.delete();
+          ConsoleHelper.indent('Removed existing executable');
+        } else {
+          ConsoleHelper.indent('⊘ Skipped existing boost executable (use --overwrite to replace)');
+          return InstallResult.success(['boost executable']);
+        }
+      }
+
+      // Copy the executable file
+      await sourceFile.copy(targetExecutablePath);
+      ConsoleHelper.success('Boost executable installed');
+      ConsoleHelper.indent('Location: $targetExecutablePath');
+
+      // Create wrapper script
+      final wrapperResult = await _createWrapperScript();
+
+      return wrapperResult;
+    } catch (e) {
+      ConsoleHelper.error('Failed to install boost executable: $e');
+      return InstallResult.failure({'boost executable': e.toString()});
+    }
+  }
+
+  /// Create wrapper script at project root
+  Future<InstallResult> _createWrapperScript() async {
+    try {
+      ConsoleHelper.info('Creating wrapper script...');
+
+      final wrapperPath = '${_project!.rootPath}/run-boost.sh';
+      final wrapperFile = File(wrapperPath);
+
+      // Check if wrapper already exists
+      if (await wrapperFile.exists()) {
+        if (_config.overwrite) {
+          await wrapperFile.delete();
+          ConsoleHelper.indent('Removed existing wrapper script');
+        } else {
+          ConsoleHelper.indent('⊘ Skipped existing wrapper script (use --overwrite to replace)');
+          return InstallResult.success(['wrapper script']);
+        }
+      }
+
+      // Calculate relative path from project root to server directory
+      final serverDirName = p.basename(_project!.serverPath!);
+
+      // Create wrapper script content
+      final scriptContent = '''#!/bin/bash
+cd "\$(dirname "\$0")/$serverDirName" && exec dart run serverpod_boost:boost --path=${_project!.rootPath} "\$@"
+''';
+
+      // Write wrapper script
+      await wrapperFile.writeAsString(scriptContent);
+
+      // Make executable
+      await Process.run('chmod', ['+x', wrapperPath]);
+
+      ConsoleHelper.success('Wrapper script created');
+      ConsoleHelper.indent('Location: $wrapperPath');
+      ConsoleHelper.indent('Usage: ./run-boost.sh <command> [options]');
+
+      return InstallResult.success(['wrapper script']);
+    } catch (e) {
+      ConsoleHelper.error('Failed to create wrapper script: $e');
+      return InstallResult.failure({'wrapper script': e.toString()});
+    }
+  }
+
+  /// Find the Boost package root directory
+  Future<String> _findBoostPackageRoot() async {
+    // Strategy 1: Use package_config to locate serverpod_boost package
+    try {
+      final packageConfig = await findPackageConfig(Directory.current);
+      if (packageConfig != null) {
+        final boostPackage = packageConfig['serverpod_boost'];
+        if (boostPackage != null) {
+          ConsoleHelper.indent('Found Boost package via package_config');
+          return boostPackage.root.path;
+        }
+      }
+    } catch (e) {
+      // Ignore and try next strategy
+    }
+
+    // Strategy 2: Try local development path (for when working on boost itself)
+    try {
+      final currentScript = File.fromUri(Platform.script);
+      final binDir = currentScript.parent;
+      final packageRoot = binDir.parent;
+      ConsoleHelper.indent('Using local development path');
+      return packageRoot.path;
+    } catch (e) {
+      // Fallback
+      ConsoleHelper.indent('Using fallback path');
+      return '.';
     }
   }
 

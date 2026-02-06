@@ -51,9 +51,27 @@ AI 어시스턴트가 ServerPod 프로젝트에서 작업할 때 겪는 어려�
 
 ## 설치
 
-### 방법 1: 대화형 설치 (추천)
+### 방법 1: 자동 설치 (추천)
 
-가장 쉬운 방법은 대화형 설치 스크립트를 사용하는 것입니다:
+가장 쉬운 방법은 Dart 명령어로 자동 설치하는 것입니다:
+
+```bash
+# ServerPod 프로젝트 루트로 이동
+cd your_serverpod_project
+
+# 자동 설치 실행
+dart run serverpod_boost:install
+```
+
+설치 프로세스가 자동으로 다음을 수행합니다:
+- ✅ ServerPod 프로젝트 구조 감지
+- ✅ `run-boost.sh` 래퍼 스크립트 생성
+- ✅ 필요한 모든 의존성 설치
+- ✅ Claude Desktop 설정 안내 출력
+
+### 방법 2: 대화형 설치 스크립트
+
+대화형 설치 스크립트를 사용할 수도 있습니다:
 
 ```bash
 # ServerPod 프로젝트 루트로 이동
@@ -63,14 +81,7 @@ cd your_serverpod_project
 bash /path/to/serverpod_boost/bin/install.sh
 ```
 
-설치 스크립트가 자동으로 다음을 수행합니다:
-- ✅ ServerPod 프로젝트 구조 감지
-- ✅ `.ai/boost` 디렉토리 생성
-- ✅ 필요한 모든 파일 복사
-- ✅ 로컬 개발 오버라이드 설정
-- ✅ Claude Desktop 설정 안내 출력
-
-### 방법 2: 수동 설치
+### 방법 3: 수동 설치
 
 ```bash
 # ServerPod 프로젝트의 server 패키지로 이동
@@ -84,7 +95,7 @@ cd .ai/boost
 dart pub add serverpod_boost --path=/path/to/serverpod_boost
 ```
 
-### 방법 3: 전역 설치
+### 방법 4: 전역 설치
 
 ```bash
 # 전역으로 활성화
@@ -98,47 +109,50 @@ export PATH="$PATH":"$HOME/.pub-cache/bin"
 
 Claude Desktop에서 ServerPod Boost를 사용하려면 MCP 설정을 추가해야 합니다.
 
-**macOS**:
+**새로운 래퍼 스크립트 방식 (추천)**:
+
+설치 명령어를 실행하면 자동으로 `run-boost.sh` 스크립트가 생성됩니다:
+
+```bash
+dart run serverpod_boost:install
+```
+
+그 후 Claude Desktop 설정에 다음을 추가합니다:
+
+**모든 플랫폼 (macOS, Windows, Linux)**:
 ```json
 {
   "mcpServers": {
     "serverpod-boost": {
-      "command": "dart",
-      "args": ["run", "serverpod_boost:boost", "--path=/path/to/your/project"]
+      "command": "/path/to/your/project/run-boost.sh",
+      "args": []
     }
   }
 }
 ```
 
-설정 파일 경로: `~/Library/Application Support/Claude/claude_desktop_config.json`
+설정 파일 경로:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
-**Windows**:
+**예시**:
 ```json
 {
   "mcpServers": {
     "serverpod-boost": {
-      "command": "dart",
-      "args": ["run", "serverpod_boost:boost", "--path=C:\\path\\to\\your\\project"]
+      "command": "/Users/username/projects/my_project/run-boost.sh",
+      "args": []
     }
   }
 }
 ```
 
-설정 파일 경로: `%APPDATA%\Claude\claude_desktop_config.json`
-
-**Linux**:
-```json
-{
-  "mcpServers": {
-    "serverpod-boost": {
-      "command": "dart",
-      "args": ["run", "serverpod_boost:boost", "--path=/path/to/your/project"]
-    }
-  }
-}
-```
-
-설정 파일 경로: `~/.config/Claude/claude_desktop_config.json`
+**장점**:
+- ✅ 자동으로 프로젝트 구조를 감지합니다
+- ✅ `server` 디렉토리로 자동 이동합니다
+- ✅ 복잡한 경로 설정이 필요 없습니다
+- ✅ 모든 ServerPod 프로젝트 구조에서 작동합니다
 
 ### 설치 확인
 
@@ -163,10 +177,27 @@ boost info
 
 ```bash
 cd your_serverpod_project
-boost install
+dart run serverpod_boost:install
 ```
 
-**2단계: Claude Desktop 재시작**
+이 명령어가 `run-boost.sh` 래퍼 스크립트를 자동으로 생성합니다.
+
+**2단계: Claude Desktop 설정**
+
+Claude Desktop 설정 파일에 다음을 추가하세요:
+
+```json
+{
+  "mcpServers": {
+    "serverpod-boost": {
+      "command": "/path/to/your/project/run-boost.sh",
+      "args": []
+    }
+  }
+}
+```
+
+**3단계: Claude Desktop 재시작**
 
 Claude Desktop을 완전히 종료했다가 다시 시작합니다.
 
@@ -982,15 +1013,28 @@ ServerPod Boost는 강력한 CLI를 제공합니다.
 
 ### boost install
 
-대화형 설치를 실행합니다. 모든 기능(가이드라인, 스킬, MCP 설정)을 한 번에 설치합니다.
+ServerPod Boost MCP 서버용 래퍼 스크립트를 생성합니다.
 
 ```bash
-boost install
+dart run serverpod_boost:install
 ```
 
-대화형 프롬프트를 건너뛰고 모든 기능을 설치하려면:
-```bash
-boost install --non-interactive
+이 명령어가 프로젝트 루트에 `run-boost.sh` 스크립트를 생성합니다. 스크립트는:
+- 자동으로 프로젝트 구조를 감지합니다
+- `server` 디렉토리로 자동 이동합니다
+- MCP 서버를 올바른 경로에서 실행합니다
+
+래퍼 스크립트를 생성한 후에는 Claude Desktop 설정에서 이 스크립트 경로를 사용하세요:
+
+```json
+{
+  "mcpServers": {
+    "serverpod-boost": {
+      "command": "/path/to/your/project/run-boost.sh",
+      "args": []
+    }
+  }
+}
 ```
 
 ---
@@ -1423,8 +1467,8 @@ project_server/lib/src/
 {
   "mcpServers": {
     "serverpod-boost": {
-      "command": "dart",
-      "args": ["run", "serverpod_boost:boost", "--path=/absolute/path/to/project"]
+      "command": "/absolute/path/to/your/project/run-boost.sh",
+      "args": []
     }
   }
 }
@@ -1432,11 +1476,27 @@ project_server/lib/src/
 
 2. 경로가 절대 경로인지 확인:
 ```json
-"args": ["run", "serverpod_boost:boost", "--path=/Users/username/projects/my_project"]  ✓
-"args": ["run", "serverpod_boost:boost", "--path=~/projects/my_project"]               ✗
+"command": "/Users/username/projects/my_project/run-boost.sh"  ✓
+"command": "~/projects/my_project/run-boost.sh"               ✗
 ```
 
-3. 상세 로깅으로 디버깅:
+3. 래퍼 스크립트에 실행 권한이 있는지 확인:
+```bash
+chmod +x /path/to/your/project/run-boost.sh
+```
+
+4. 래퍼 스크립트가 존재하는지 확인:
+```bash
+ls -la /path/to/your/project/run-boost.sh
+```
+
+스크립트가 없으면 다시 설치:
+```bash
+cd /path/to/your/project
+dart run serverpod_boost:install
+```
+
+5. 상세 로깅으로 디버깅:
 ```bash
 export SERVERPOD_BOOST_LOG_LEVEL=debug
 ```

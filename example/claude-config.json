@@ -2,12 +2,7 @@
   "_comment": "Example Claude Desktop MCP configuration for ServerPod Boost",
   "mcpServers": {
     "serverpod-boost": {
-      "command": "dart",
-      "args": [
-        "run",
-        "/Users/musinsa/always_summer/serverpod_boost/bin/boost.dart",
-        "--path=/path/to/your/project"
-      ]
+      "command": "/path/to/your/project/run-boost.sh"
     }
   }
 }

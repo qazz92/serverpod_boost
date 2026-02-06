@@ -34,8 +34,9 @@ void main() {
         // Test config generation to verify it works
         final config = agent.generateMcpConfig(mockProject);
         expect(config['mcpServers']['serverpod-boost'], isNotNull);
-        expect(config['mcpServers']['serverpod-boost']['args'],
-            contains('--path=${mockProject.rootPath}'));
+        expect(config['mcpServers']['serverpod-boost']['command'],
+            contains('run-boost.sh'));
+        expect(config['mcpServers']['serverpod-boost']['args'], isEmpty);
       });
 
       test('finds OpenCode when installed', () async {
@@ -47,8 +48,9 @@ void main() {
         // Test config generation to verify it works
         final config = agent.generateMcpConfig(mockProject);
         expect(config['servers']['serverpod-boost'], isNotNull);
-        expect(config['servers']['serverpod-boost']['args'],
-            contains('--path=${mockProject.rootPath}'));
+        expect(config['servers']['serverpod-boost']['command'],
+            contains('run-boost.sh'));
+        expect(config['servers']['serverpod-boost']['args'], isEmpty);
       });
 
       test('returns empty list when no agents installed', () async {
@@ -72,8 +74,9 @@ void main() {
         // Test config generation to verify it works
         final config = agent.generateMcpConfig(mockProject);
         expect(config['mcpServers']['serverpod-boost'], isNotNull);
-        expect(config['mcpServers']['serverpod-boost']['args'],
-            contains('--path=${mockProject.rootPath}'));
+        expect(config['mcpServers']['serverpod-boost']['command'],
+            contains('run-boost.sh'));
+        expect(config['mcpServers']['serverpod-boost']['args'], isEmpty);
       });
 
       test('checks specific agent - OpenCode', () async {
@@ -83,8 +86,9 @@ void main() {
         // Test config generation to verify it works
         final config = agent.generateMcpConfig(mockProject);
         expect(config['servers']['serverpod-boost'], isNotNull);
-        expect(config['servers']['serverpod-boost']['args'],
-            contains('--path=${mockProject.rootPath}'));
+        expect(config['servers']['serverpod-boost']['command'],
+            contains('run-boost.sh'));
+        expect(config['servers']['serverpod-boost']['args'], isEmpty);
       });
     });
   });

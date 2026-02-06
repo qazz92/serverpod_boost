@@ -48,13 +48,13 @@ void main() {
       expect(mcpServers, containsPair('serverpod-boost', isNotNull));
 
       final serverpodBoost = mcpServers['serverpod-boost'] as Map;
-      expect(serverpodBoost, containsPair('command', 'dart'));
+      expect(serverpodBoost, containsPair('command', '${testProject.rootPath}/run-boost.sh'));
       expect(serverpodBoost, containsPair('args', isNotNull));
 
       final args = serverpodBoost['args'] as List;
-      expect(args, contains('run'));
-      expect(args, contains('serverpod_boost:boost'));
-      expect(args, contains('--path=${testProject.rootPath}'));
+      expect(args, isEmpty);
+      expect(serverpodBoost, isNot(contains('cwd')));
+      expect(serverpodBoost, isNot(contains('env')));
     });
 
     test('supports correct file types', () {
@@ -88,7 +88,7 @@ void main() {
 
       final generated = {
         'mcpServers': {
-          'serverpod-boost': {'command': 'dart'},
+          'serverpod-boost': {'command': '/tmp/test_project/run-boost.sh', 'args': []},
         },
       };
 
@@ -116,7 +116,7 @@ void main() {
 
         final content = await configFile.readAsString();
         expect(content, contains('serverpod-boost'));
-        expect(content, contains('dart'));
+        expect(content, contains('run-boost.sh'));
       } finally {
         tempDir.deleteSync(recursive: true);
       }
